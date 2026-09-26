@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
+use App\Models\AuditEvent;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +42,17 @@ class AcademicYearController extends Controller
                 AcademicYear::query()->update(['is_current' => false]);
             }
 
-            AcademicYear::create($validated);
+            $academicYear = AcademicYear::create($validated);
+
+            AuditEvent::create([
+                'actor_id' => request()->user()?->id,
+                'action' => 'academic_year.created',
+                'auditable_type' => AcademicYear::class,
+                'auditable_id' => $academicYear->id,
+                'after' => $academicYear->only(['name', 'code', 'start_date', 'end_date', 'is_current']),
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return redirect()->back()->with('success', 'Année universitaire créée avec succès !');
@@ -53,11 +64,24 @@ class AcademicYearController extends Controller
     public function setCurrent(AcademicYear $academicYear): RedirectResponse
     {
         DB::transaction(function () use ($academicYear) {
+            $previousCurrentYear = AcademicYear::where('is_current', true)->value('id');
+
             // Reinitialiser toutes les années
             AcademicYear::query()->update(['is_current' => false]);
 
             // Activer la sélectionnée
             $academicYear->update(['is_current' => true]);
+
+            AuditEvent::create([
+                'actor_id' => request()->user()?->id,
+                'action' => 'academic_year.set_current',
+                'auditable_type' => AcademicYear::class,
+                'auditable_id' => $academicYear->id,
+                'before' => ['current_academic_year_id' => $previousCurrentYear],
+                'after' => ['current_academic_year_id' => $academicYear->id],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return redirect()->back()->with('success', "L'année {$academicYear->name} est désormais l'année universitaire courante.");
@@ -71,7 +95,20 @@ class AcademicYearController extends Controller
             ]);
         }
 
-        $academicYear->delete();
+        DB::transaction(function () use ($academicYear) {
+            $before = $academicYear->only(['name', 'code', 'start_date', 'end_date', 'is_current']);
+            $academicYear->delete();
+
+            AuditEvent::create([
+                'actor_id' => request()->user()?->id,
+                'action' => 'academic_year.deleted',
+                'auditable_type' => AcademicYear::class,
+                'auditable_id' => $academicYear->id,
+                'before' => $before,
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        });
 
         return redirect()->back()->with('success', 'Année académique supprimée.');
     }

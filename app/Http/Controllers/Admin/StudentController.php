@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
+use App\Models\AuditEvent;
 use App\Models\Department;
 use App\Models\Enrollment;
 use App\Models\Faculty;
@@ -22,6 +23,8 @@ class StudentController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorize('viewAny', Student::class);
+
         $query = Student::query()->with(['user', 'department.faculty', 'enrollments.academicYear', 'enrollments.program']);
 
         if ($request->filled('search')) {
@@ -66,6 +69,8 @@ class StudentController extends Controller
 
     public function create(): Response
     {
+        $this->authorize('create', Student::class);
+
         return Inertia::render('Admin/Students/Create', [
             'departments' => Department::with(['faculty:id,name', 'programs:id,department_id,name,code'])->orderBy('name')->get(['id', 'faculty_id', 'name', 'code']),
             'academicYears' => AcademicYear::select('id', 'name', 'is_current')->orderByDesc('start_date')->get(),
@@ -75,6 +80,8 @@ class StudentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Student::class);
+
         $currentYearId = AcademicYear::where('is_current', true)->value('id');
         if (!$request->filled('academic_year_id') && $currentYearId) {
             $request->merge(['academic_year_id' => $currentYearId]);
@@ -139,6 +146,22 @@ class StudentController extends Controller
                 'status' => 'active',
             ]);
 
+            AuditEvent::create([
+                'actor_id' => request()->user()?->id,
+                'action' => 'student.enrolled',
+                'auditable_type' => Student::class,
+                'auditable_id' => $student->id,
+                'after' => [
+                    'registration_number' => $student->registration_number,
+                    'department_id' => $department->id,
+                    'program_id' => $validated['program_id'],
+                    'academic_year_id' => $validated['academic_year_id'],
+                    'level' => $validated['level'],
+                ],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+
             return $student;
         });
 
@@ -152,6 +175,8 @@ class StudentController extends Controller
 
     public function show(Student $student): Response
     {
+        $this->authorize('view', $student);
+
         $student->load(['user', 'department.faculty', 'enrollments.academicYear', 'enrollments.program']);
 
         return Inertia::render('Admin/Students/Show', ['student' => $student]);

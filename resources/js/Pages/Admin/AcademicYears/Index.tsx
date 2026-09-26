@@ -1,5 +1,6 @@
 import React from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
+import BackButton from '@/Components/BackButton';
 
 interface AcademicYear {
     id: string;
@@ -43,6 +44,8 @@ export default function Index({ academicYears = [] }: Props) {
     return (
         <div className="max-w-6xl p-6 mx-auto my-8 bg-white shadow-sm rounded-xl">
             <Head title="Gestion des Années Académiques" />
+
+            <div className="mb-5"><BackButton href={route('admin.dashboard')} label="Retour au tableau de bord" /></div>
 
             <h1 className="mb-6 text-2xl font-bold text-slate-800">
                 Gestion des Années Académiques

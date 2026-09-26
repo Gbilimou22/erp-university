@@ -13,6 +13,11 @@ use Inertia\Response;
 
 class TeacherController extends Controller
 {
+    public function create(): Response
+    {
+        return Inertia::render('Admin/Teachers/Create');
+    }
+
     public function index(): Response
     {
         return Inertia::render('Admin/Teachers/Index', [

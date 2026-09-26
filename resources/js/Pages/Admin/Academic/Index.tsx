@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import BackButton from '@/Components/BackButton';
 import { Building2, Landmark, Plus, Folder, X, Loader2, Edit2, Trash2, MapPin } from 'lucide-react';
 
 interface Department {
@@ -209,35 +210,35 @@ export default function Index({ campuses = [] }: Props) {
 
     return (
         <AuthenticatedLayout
-            header={<h2 className="text-xl font-semibold leading-tight text-slate-800">Structure Académique</h2>}
+            header={
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Administration</p>
+                        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Structure académique</h1>
+                        <p className="mt-1 text-sm text-slate-500">Configuration et organisation hiérarchique de l’université.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setEditingCampus(null);
+                            campusForm.reset();
+                            setShowCampusModal(true);
+                        }}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200"
+                    >
+                        <Plus className="h-4 w-4" /> Ajouter un campus
+                    </button>
+                </div>
+            }
         >
             <Head title="Structure Académique" />
 
-            <div className="min-h-screen p-6 space-y-6 bg-slate-50">
-                {/* En-tête principal */}
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800">Structure Académique</h1>
-                        <p className="text-sm text-slate-500">Configuration et organisation hiérarchique de l'université</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setEditingCampus(null);
-                                campusForm.reset();
-                                setShowCampusModal(true);
-                            }}
-                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white transition-colors bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700"
-                        >
-                            <Plus className="w-4 h-4" /> Ajouter un Campus
-                        </button>
-                    </div>
-                </div>
-
+            <div className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-7xl">
+                <div className="mb-5"><BackButton href={route('admin.dashboard')} label="Retour au tableau de bord" /></div>
                 {/* Arborescence Visuelle des Campus */}
                 {campuses.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         {campuses.map((campus) => (
                             <div key={campus.id} className="flex flex-col justify-between overflow-hidden bg-white border shadow-sm rounded-xl border-slate-200">
                                 <div>
@@ -395,6 +396,7 @@ export default function Index({ campuses = [] }: Props) {
                         <p className="mt-1 text-xs text-slate-400">Commencez par ajouter un campus pour structurer votre université.</p>
                     </div>
                 )}
+                </div>
             </div>
 
             {/* Modal Campus (Création & Édition) */}

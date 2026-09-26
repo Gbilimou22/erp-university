@@ -23,12 +23,12 @@ export default function Register() {
     };
 
     return (
-        <GuestLayout>
-            <Head title="Register" />
+        <GuestLayout title="Créer un compte" description="Créez vos identifiants pour accéder au portail universitaire.">
+            <Head title="Créer un compte" />
 
-            <form onSubmit={submit}>
+            <form onSubmit={submit} className="space-y-4">
                 <div>
-                    <InputLabel htmlFor="name" value="Name" />
+                    <InputLabel htmlFor="name" value="Nom complet" />
 
                     <TextInput
                         id="name"
@@ -44,8 +44,8 @@ export default function Register() {
                     <InputError message={errors.name} className="mt-2" />
                 </div>
 
-                <div className="mt-4">
-                    <InputLabel htmlFor="email" value="Email" />
+                <div>
+                    <InputLabel htmlFor="email" value="Adresse e-mail" />
 
                     <TextInput
                         id="email"
@@ -61,8 +61,8 @@ export default function Register() {
                     <InputError message={errors.email} className="mt-2" />
                 </div>
 
-                <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
+                <div>
+                    <InputLabel htmlFor="password" value="Mot de passe" />
 
                     <TextInput
                         id="password"
@@ -78,10 +78,10 @@ export default function Register() {
                     <InputError message={errors.password} className="mt-2" />
                 </div>
 
-                <div className="mt-4">
+                <div>
                     <InputLabel
                         htmlFor="password_confirmation"
-                        value="Confirm Password"
+                        value="Confirmer le mot de passe"
                     />
 
                     <TextInput
@@ -103,16 +103,16 @@ export default function Register() {
                     />
                 </div>
 
-                <div className="mt-4 flex items-center justify-end">
+                <div className="flex flex-col-reverse items-stretch gap-4 pt-2 sm:flex-row sm:items-center sm:justify-between">
                     <Link
                         href={route('login')}
-                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        className="text-center text-sm font-medium text-indigo-700 hover:text-indigo-900 sm:text-left"
                     >
-                        Already registered?
+                        Déjà inscrit ? Se connecter
                     </Link>
 
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Register
+                    <PrimaryButton className="justify-center bg-indigo-700 text-sm normal-case tracking-normal hover:bg-indigo-800" disabled={processing}>
+                        {processing ? 'Création du compte…' : 'Créer mon compte'}
                     </PrimaryButton>
                 </div>
             </form>

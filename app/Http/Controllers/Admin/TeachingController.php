@@ -21,8 +21,16 @@ class TeachingController extends Controller
     {
         return Inertia::render('Admin/Teaching/Index', [
             'faculties' => Faculty::query()->orderBy('name')->get(['id', 'name', 'code']),
-            'courseUnits' => CourseUnit::query()->with(['faculty:id,name,code', 'subjects:id,course_unit_id,code,name,coefficient'])
+            'courseUnits' => CourseUnit::query()->with('faculty:id,name,code')->withCount('subjects')
                 ->withCount('subjects')->orderBy('name')->get(),
+        ]);
+    }
+
+    public function subjects(): Response
+    {
+        return Inertia::render('Admin/Teaching/Subjects', [
+            'courseUnits' => CourseUnit::query()->with(['faculty:id,name', 'subjects:id,course_unit_id,code,name,coefficient'])
+                ->orderBy('name')->get(['id', 'faculty_id', 'code', 'name', 'credits']),
         ]);
     }
 
@@ -119,7 +127,7 @@ class TeachingController extends Controller
         ]);
         Subject::create([...$data, 'code' => strtoupper($data['code'])]);
 
-        return back()->with('success', 'Matière (ECUE) créée.');
+        return redirect()->route('admin.teaching.subjects.index')->with('success', 'Matière (ECUE) créée.');
     }
 
     public function updateSubject(Request $request, Subject $subject): RedirectResponse
@@ -132,7 +140,7 @@ class TeachingController extends Controller
         ]);
         $subject->update([...$data, 'code' => strtoupper($data['code'])]);
 
-        return back()->with('success', 'Matière mise à jour.');
+        return redirect()->route('admin.teaching.subjects.index')->with('success', 'Matière mise à jour.');
     }
 
     public function destroySubject(Subject $subject): RedirectResponse

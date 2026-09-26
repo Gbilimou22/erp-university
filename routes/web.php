@@ -18,12 +18,12 @@ use Inertia\Inertia;
 Route::get('/', [PortalController::class, 'index'])->name('portal.index');
 
 // 2. Espaces Sécurisés
-Route::middleware('auth')->prefix('first-login')->name('first-login.')->group(function () {
+Route::middleware(['auth', 'active'])->prefix('first-login')->name('first-login.')->group(function () {
     Route::get('/password', [FirstLoginPasswordController::class, 'edit'])->name('password.edit');
     Route::put('/password', [FirstLoginPasswordController::class, 'update'])->name('password.update');
 });
 
-Route::middleware(['auth', 'verified', RequirePasswordChange::class])->group(function () {
+Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])->group(function () {
 
     // --- DASHBOARD GÉNÉRAL DE REDIRECTION (/dashboard) ---
     Route::get('/dashboard', function () {
@@ -44,9 +44,12 @@ Route::middleware(['auth', 'verified', RequirePasswordChange::class])->group(fun
         // Tableau de bord Admin
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
+        Route::get('/teachers/create', [TeacherController::class, 'create'])->name('teachers.create');
         Route::post('/teachers', [TeacherController::class, 'store'])->name('teachers.store');
         Route::controller(TimetableController::class)->prefix('timetable')->name('timetable.')->group(function () {
             Route::get('/', 'index')->name('index');
+            Route::get('/rooms', 'rooms')->name('rooms.index');
+            Route::get('/entries', 'entries')->name('entries.index');
             Route::post('/rooms', 'storeRoom')->name('rooms.store');
             Route::delete('/rooms/{room}', 'destroyRoom')->name('rooms.destroy');
             Route::post('/entries', 'storeEntry')->name('entries.store');
@@ -55,6 +58,7 @@ Route::middleware(['auth', 'verified', RequirePasswordChange::class])->group(fun
 
         Route::prefix('teaching')->name('teaching.')->controller(TeachingController::class)->group(function () {
             Route::get('/course-units', 'index')->name('index');
+            Route::get('/subjects', 'subjects')->name('subjects.index');
             Route::get('/assignments', 'assignments')->name('assignments');
             Route::post('/assignments', 'storeAssignment')->name('assignments.store');
             Route::delete('/assignments/{subject}/{teacher}', 'destroyAssignment')->name('assignments.destroy');

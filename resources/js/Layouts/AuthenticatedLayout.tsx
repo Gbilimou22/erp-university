@@ -1,4 +1,4 @@
-import ApplicationLogo from '@/Components/ApplicationLogo';
+import UniversityLogo from '@/Components/UniversityLogo';
 import Dropdown from '@/Components/Dropdown';
 import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
@@ -17,14 +17,14 @@ export default function Authenticated({
         useState(false);
 
     return (
-        <div className="min-h-screen bg-gray-100">
-            <nav className="bg-white border-b border-gray-100">
+        <div className="min-h-screen bg-slate-100">
+            <nav className="border-b border-slate-200 bg-white">
                 <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16">
                         <div className="flex">
                             <div className="flex items-center shrink-0">
                                 <Link href="/">
-                                    <ApplicationLogo className="block w-auto text-gray-800 fill-current h-9" />
+                                    <UniversityLogo />
                                 </Link>
                             </div>
 
@@ -32,9 +32,9 @@ export default function Authenticated({
                             <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                                 <NavLink
                                     href={route('dashboard')}
-                                    active={route().current('dashboard')}
+                                    active={route().current('dashboard') || route().current('admin.dashboard')}
                                 >
-                                    Dashboard
+                                    Tableau de bord
                                 </NavLink>
 
                                 {isAdmin && <>
@@ -159,9 +159,9 @@ export default function Authenticated({
                         {isAdmin && <>
                         <ResponsiveNavLink
                             href={route('dashboard')}
-                            active={route().current('dashboard')}
+                                    active={route().current('dashboard') || route().current('admin.dashboard')}
                         >
-                            Dashboard
+                            Tableau de bord
                         </ResponsiveNavLink>
 
                         <ResponsiveNavLink
@@ -211,7 +211,7 @@ export default function Authenticated({
             </nav>
 
             {header && (
-                <header className="bg-white shadow">
+                <header className="border-b border-slate-200 bg-white">
                     <div className="px-4 py-6 mx-auto max-w-7xl sm:px-6 lg:px-8">
                         {header}
                     </div>

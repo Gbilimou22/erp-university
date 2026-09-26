@@ -1,6 +1,7 @@
 import React from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import { Search, UserPlus } from 'lucide-react';
+import BackButton from '@/Components/BackButton';
 
 interface Student {
     id: number;
@@ -40,6 +41,7 @@ export default function StudentsIndex({ students, faculties, departments, progra
         <>
             <Head title="Étudiants" />
             <main className="mx-auto min-h-screen max-w-7xl space-y-6 bg-slate-50 p-6">
+                <BackButton href={route('admin.dashboard')} label="Retour au tableau de bord" />
                 <header className="flex flex-wrap items-center justify-between gap-4">
                     <div><h1 className="text-2xl font-bold text-slate-800">Étudiants</h1><p className="text-sm text-slate-500">Rechercher et filtrer les inscriptions.</p></div>
                     <Link href={route('admin.students.create')} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white"><UserPlus className="h-4 w-4" />Nouvelle inscription</Link>

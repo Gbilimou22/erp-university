@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Campus;
+use App\Models\AcademicYear;
 use App\Models\Room;
 use App\Models\SubjectTeacherAssignment;
 use App\Models\TimetableEntry;
@@ -31,14 +32,32 @@ class TimetableController extends Controller
             'assignments' => $assignments,
             'currentYearId' => $assignments->first(fn ($assignment) => $assignment->academicYear->is_current)?->academic_year_id
                 ?? $assignments->first()?->academic_year_id,
-            'entries' => TimetableEntry::query()->with([
-                'assignment.subject:id,course_unit_id,code,name',
-                'assignment.subject.courseUnit:id,code,name',
-                'assignment.teacher:id,name',
-                'assignment.academicYear:id,name,is_current',
-                'room:id,campus_id,code,name',
-                'room.campus:id,name',
-            ])->orderBy('weekday')->orderBy('start_time')->get(),
+        ]);
+    }
+
+    public function rooms(): Response
+    {
+        return Inertia::render('Admin/Teachers/Rooms', [
+            'rooms' => Room::query()->with('campus:id,name')->withCount('timetableEntries')->orderBy('name')->get(),
+        ]);
+    }
+
+    public function entries(): Response
+    {
+        $entries = TimetableEntry::query()->with([
+            'assignment.subject:id,course_unit_id,code,name',
+            'assignment.subject.courseUnit:id,code,name',
+            'assignment.teacher:id,name',
+            'assignment.academicYear:id,name,is_current',
+            'room:id,campus_id,code,name',
+            'room.campus:id,name',
+        ])->orderBy('weekday')->orderBy('start_time')->get();
+
+        return Inertia::render('Admin/Teachers/Entries', [
+            'entries' => $entries,
+            'academicYears' => AcademicYear::query()->orderByDesc('start_date')->get(['id', 'name', 'is_current']),
+            'currentYearId' => $entries->first(fn ($entry) => $entry->assignment->academicYear->is_current)?->assignment->academic_year_id
+                ?? $entries->first()?->assignment->academic_year_id,
         ]);
     }
 
@@ -55,7 +74,7 @@ class TimetableController extends Controller
         $request->validate(['code' => [Rule::unique('rooms', 'code')->where('campus_id', $data['campus_id'])]]);
         Room::create($data);
 
-        return back()->with('success', 'Salle créée.');
+        return redirect()->route('admin.timetable.rooms.index')->with('success', 'Salle créée.');
     }
 
     public function destroyRoom(Room $room): RedirectResponse
@@ -109,7 +128,7 @@ class TimetableController extends Controller
             TimetableEntry::create($data);
         });
 
-        return back()->with('success', 'Créneau ajouté à l’emploi du temps.');
+        return redirect()->route('admin.timetable.entries.index')->with('success', 'Créneau ajouté à l’emploi du temps.');
     }
 
     public function destroyEntry(TimetableEntry $entry): RedirectResponse

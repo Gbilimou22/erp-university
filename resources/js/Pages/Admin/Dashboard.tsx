@@ -1,12 +1,11 @@
-import React from 'react';
 import { Head, Link } from '@inertiajs/react';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import {
     Building2,
     GraduationCap,
     Users,
     UserCheck,
     Folder,
-    Clock,
     TrendingUp
 } from 'lucide-react';
 import { Line, Doughnut } from 'react-chartjs-2';
@@ -45,8 +44,7 @@ interface MonthlyStat {
 }
 
 interface StudentUser {
-    first_name: string;
-    last_name: string;
+    name?: string;
 }
 
 interface StudentEnrollment {
@@ -57,6 +55,8 @@ interface StudentEnrollment {
 
 interface Student {
     id: string | number;
+    first_name?: string;
+    last_name?: string;
     registration_number?: string;
     status?: string;
     user?: StudentUser;
@@ -69,7 +69,6 @@ interface StatsData {
     total_users?: number;
     total_faculties?: number;
     total_departments?: number;
-    pending_students?: number;
 }
 
 interface DashboardProps {
@@ -118,26 +117,48 @@ export default function Dashboard({
         ],
     };
 
+    const registrationChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { precision: 0 },
+            },
+        },
+    };
+
+    const statusLabels: Record<string, string> = {
+        active: 'Actif',
+        pending: 'En attente',
+        suspended: 'Suspendu',
+        graduated: 'Diplômé',
+    };
+
     return (
         <>
             <Head title="Tableau de Bord Administration" />
 
-            <div className="min-h-screen p-6 space-y-6 bg-slate-50">
-                {/* En-tête avec raccourcis */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800">Tableau de Bord Super Admin</h1>
-                        <p className="text-sm text-slate-500">Vue d'ensemble et statistiques de l'université en temps réel</p>
-                    </div>
-                    <div className="flex gap-3">
+            <AuthenticatedLayout
+                header={
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Administration</p>
+                            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Tableau de bord</h1>
+                            <p className="mt-1 text-sm text-slate-500">Vue d’ensemble des données universitaires.</p>
+                        </div>
                         <Link
                             href={route('admin.academic.index')}
-                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white transition-colors bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700"
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200"
                         >
-                            <Building2 className="w-4 h-4" /> Structure Académique
+                            <Building2 className="h-4 w-4" aria-hidden="true" />
+                            Structure académique
                         </Link>
                     </div>
-                </div>
+                }
+            >
+                <div className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
+                    <div className="mx-auto max-w-7xl space-y-6">
 
                 {/* Cartes de statistiques */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -180,8 +201,8 @@ export default function Dashboard({
                         <div>
                             <p className="text-xs font-semibold uppercase text-slate-500">Départements</p>
                             <h3 className="mt-1 text-2xl font-bold text-slate-800">{stats.total_departments ?? 0}</h3>
-                            <p className="flex items-center gap-1 mt-1 text-xs font-medium text-amber-600">
-                                <Clock className="w-3.5 h-3.5" /> {stats.pending_students ?? 0} en attente
+                            <p className="mt-1 text-xs text-slate-400">
+                                Structure académique
                             </p>
                         </div>
                         <div className="p-3 text-emerald-600 bg-emerald-50 rounded-xl">
@@ -200,8 +221,8 @@ export default function Dashboard({
                             </h2>
                         </div>
                         <div className="flex items-center justify-center h-64">
-                            {monthlyRegistrations.length > 0 ? (
-                                <Line data={registrationChartData} options={{ responsive: true, maintainAspectRatio: false }} />
+                            {monthlyRegistrations.some((month) => month.count > 0) ? (
+                                <Line data={registrationChartData} options={registrationChartOptions} />
                             ) : (
                                 <p className="text-xs text-slate-400">Données insuffisantes pour afficher l'évolution.</p>
                             )}
@@ -240,28 +261,34 @@ export default function Dashboard({
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {recentStudents.length > 0 ? (
-                                    recentStudents.map((student: Student) => (
-                                        <tr key={student.id} className="hover:bg-slate-50/50">
-                                            <td className="p-3 font-mono font-medium text-slate-700">
-                                                {student.registration_number || 'N/A'}
-                                            </td>
-                                            <td className="p-3 font-semibold text-slate-800">
-                                                {student.user ? `${student.user.first_name} ${student.user.last_name}` : 'N/A'}
-                                            </td>
-                                            <td className="p-3 text-slate-600">
-                                                {student.enrollments?.[0]?.faculty?.name || 'Non affecté'}
-                                            </td>
-                                            <td className="p-3">
-                                                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                                    student.status === 'active'
-                                                        ? 'bg-emerald-100 text-emerald-800'
-                                                        : 'bg-amber-100 text-amber-800'
-                                                }`}>
-                                                    {student.status || 'actif'}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))
+                                    recentStudents.map((student: Student) => {
+                                        const status = student.status?.toLowerCase() ?? 'active';
+
+                                        return (
+                                            <tr key={student.id} className="hover:bg-slate-50/50">
+                                                <td className="p-3 font-mono font-medium text-slate-700">
+                                                    {student.registration_number || 'N/A'}
+                                                </td>
+                                                <td className="p-3 font-semibold text-slate-800">
+                                                    {[student.first_name, student.last_name].filter(Boolean).join(' ')
+                                                        || student.user?.name
+                                                        || 'Nom non renseigné'}
+                                                </td>
+                                                <td className="p-3 text-slate-600">
+                                                    {student.enrollments?.[0]?.faculty?.name || 'Non affecté'}
+                                                </td>
+                                                <td className="p-3">
+                                                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                                        status === 'active'
+                                                            ? 'bg-emerald-100 text-emerald-800'
+                                                            : 'bg-amber-100 text-amber-800'
+                                                    }`}>
+                                                        {statusLabels[status] ?? student.status ?? 'Statut inconnu'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 ) : (
                                     <tr>
                                         <td colSpan={4} className="p-4 text-xs text-center text-slate-400">
@@ -273,7 +300,9 @@ export default function Dashboard({
                         </table>
                     </div>
                 </div>
-            </div>
+                    </div>
+                </div>
+            </AuthenticatedLayout>
         </>
     );
 }

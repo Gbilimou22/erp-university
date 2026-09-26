@@ -13,36 +13,32 @@ export default function VerifyEmail({ status }: { status?: string }) {
     };
 
     return (
-        <GuestLayout>
-            <Head title="Email Verification" />
+        <GuestLayout title="Vérifiez votre adresse e-mail" description="Cette étape permet de sécuriser votre compte.">
+            <Head title="Vérification de l’adresse e-mail" />
 
-            <div className="mb-4 text-sm text-gray-600">
-                Thanks for signing up! Before getting started, could you verify
-                your email address by clicking on the link we just emailed to
-                you? If you didn't receive the email, we will gladly send you
-                another.
+            <div className="text-sm leading-6 text-slate-600">
+                Cliquez sur le lien de vérification envoyé à votre adresse e-mail. Si vous ne l’avez pas reçu, vous pouvez demander un nouvel envoi.
             </div>
 
             {status === 'verification-link-sent' && (
-                <div className="mb-4 text-sm font-medium text-green-600">
-                    A new verification link has been sent to the email address
-                    you provided during registration.
+                <div role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    Un nouveau lien vient d’être envoyé à l’adresse associée à votre compte.
                 </div>
             )}
 
-            <form onSubmit={submit}>
-                <div className="mt-4 flex items-center justify-between">
-                    <PrimaryButton disabled={processing}>
-                        Resend Verification Email
+            <form onSubmit={submit} className="mt-5 space-y-4">
+                <div>
+                    <PrimaryButton className="w-full justify-center bg-indigo-700 text-sm normal-case tracking-normal hover:bg-indigo-800" disabled={processing}>
+                        {processing ? 'Envoi en cours…' : 'Renvoyer le lien de vérification'}
                     </PrimaryButton>
 
                     <Link
                         href={route('logout')}
                         method="post"
                         as="button"
-                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        className="mt-4 block text-center text-sm font-medium text-slate-500 hover:text-slate-800"
                     >
-                        Log Out
+                        Se déconnecter
                     </Link>
                 </div>
             </form>

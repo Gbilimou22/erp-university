@@ -29,12 +29,12 @@ export default function ResetPassword({
     };
 
     return (
-        <GuestLayout>
-            <Head title="Reset Password" />
+        <GuestLayout title="Nouveau mot de passe" description="Choisissez un mot de passe sûr pour votre compte.">
+            <Head title="Nouveau mot de passe" />
 
-            <form onSubmit={submit}>
+            <form onSubmit={submit} className="space-y-4">
                 <div>
-                    <InputLabel htmlFor="email" value="Email" />
+                    <InputLabel htmlFor="email" value="Adresse e-mail" />
 
                     <TextInput
                         id="email"
@@ -49,8 +49,8 @@ export default function ResetPassword({
                     <InputError message={errors.email} className="mt-2" />
                 </div>
 
-                <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
+                <div>
+                    <InputLabel htmlFor="password" value="Nouveau mot de passe" />
 
                     <TextInput
                         id="password"
@@ -66,13 +66,14 @@ export default function ResetPassword({
                     <InputError message={errors.password} className="mt-2" />
                 </div>
 
-                <div className="mt-4">
+                <div>
                     <InputLabel
                         htmlFor="password_confirmation"
-                        value="Confirm Password"
+                        value="Confirmer le mot de passe"
                     />
 
                     <TextInput
+                        id="password_confirmation"
                         type="password"
                         name="password_confirmation"
                         value={data.password_confirmation}
@@ -89,9 +90,9 @@ export default function ResetPassword({
                     />
                 </div>
 
-                <div className="mt-4 flex items-center justify-end">
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Reset Password
+                <div className="pt-1">
+                    <PrimaryButton className="w-full justify-center bg-indigo-700 text-sm normal-case tracking-normal hover:bg-indigo-800" disabled={processing}>
+                        {processing ? 'Mise à jour…' : 'Enregistrer le nouveau mot de passe'}
                     </PrimaryButton>
                 </div>
             </form>

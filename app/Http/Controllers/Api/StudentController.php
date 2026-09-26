@@ -10,6 +10,8 @@ class StudentController extends Controller
 {
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', Student::class);
+
         return response()->json([
             'data' => Student::query()
                 ->with(['department.faculty', 'enrollments.academicYear'])
@@ -21,6 +23,8 @@ class StudentController extends Controller
 
     public function show(Student $student): JsonResponse
     {
+        $this->authorize('view', $student);
+
         return response()->json([
             'data' => $student->load(['user', 'department.faculty', 'enrollments.academicYear']),
         ]);

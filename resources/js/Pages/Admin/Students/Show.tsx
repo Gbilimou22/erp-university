@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Mail, Phone, GraduationCap } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import { Mail, Phone, GraduationCap } from 'lucide-react';
+import BackButton from '@/Components/BackButton';
 
 interface Student {
     id: number;
@@ -36,7 +37,7 @@ export default function ShowStudent({ student, flash }: Props) {
         <>
             <Head title={`Étudiant ${student.registration_number}`} />
             <main className="mx-auto min-h-screen max-w-4xl space-y-6 bg-slate-50 p-6">
-                <Link href={route('admin.students.index')} className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-blue-700"><ArrowLeft className="h-4 w-4" />Retour à la liste</Link>
+                <BackButton href={route('admin.students.index')} label="Retour à la liste des étudiants" />
                 {temporaryCredentials && (
                     <section className="rounded-xl border border-amber-300 bg-amber-50 p-5" role="alert">
                         <h2 className="font-semibold text-amber-950">Compte portail créé — identifiants temporaires</h2>
