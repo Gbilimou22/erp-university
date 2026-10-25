@@ -6,15 +6,23 @@ import { CalendarDays, MapPin, Plus, List, Building2 } from 'lucide-react';
 
 type Campus = { id: number; name: string; code: string };
 type Room = { id: number; campus_id: number; code: string; name: string; capacity: number; type: string; is_active: boolean; campus: Campus; timetable_entries_count: number };
-type Assignment = { id: number; subject: { code: string; name: string; course_unit: { code: string; name: string } }; teacher: { name: string }; academic_year_id: number; academic_year: { id: number; name: string; is_current: boolean } };
+type Assignment = { id: number; subject: { code: string; name: string; course_unit: { id: number; code: string; name: string; faculty_id: number } }; teacher: { name: string }; academic_year_id: number; academic_year: { id: number; name: string; is_current: boolean } };
+type Group = { id: string; program_id: string; academic_year_id: number; level_code: string; code: string; name: string; program: { id: string; code: string; name: string; department: { faculty_id: number }; curricula: Array<{ academic_year_id: number; semesters: Array<{ course_units: Array<{ id: number }> }> }> } };
 const days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
-export default function Timetable({ campuses, rooms, assignments, currentYearId }: { campuses: Campus[]; rooms: Room[]; assignments: Assignment[]; currentYearId?: number }) {
+export default function Timetable({ campuses, rooms, assignments, groups, currentYearId }: { campuses: Campus[]; rooms: Room[]; assignments: Assignment[]; groups: Group[]; currentYearId?: number }) {
     const [yearId, setYearId] = React.useState(String(currentYearId ?? ''));
     const roomForm = useForm({ campus_id: '', code: '', name: '', capacity: 30, type: 'classroom' });
-    const slotForm = useForm({ subject_teacher_assignment_id: '', room_id: '', weekday: 1, start_time: '08:00', end_time: '10:00' });
+    const slotForm = useForm({ subject_teacher_assignment_id: '', class_id: '', room_id: '', weekday: 1, start_time: '08:00', end_time: '10:00' });
     const years = Array.from(new Map(assignments.map((assignment) => [assignment.academic_year_id, assignment.academic_year])).values());
     const yearAssignments = assignments.filter((assignment) => String(assignment.academic_year_id) === yearId);
+    const selectedAssignment = yearAssignments.find((assignment) => String(assignment.id) === slotForm.data.subject_teacher_assignment_id);
+    const compatibleGroups = groups.filter((group) =>
+        String(group.academic_year_id) === yearId
+        && selectedAssignment
+        && group.program.department.faculty_id === selectedAssignment.subject.course_unit.faculty_id
+        && group.program.curricula.some((curriculum) => String(curriculum.academic_year_id) === yearId && curriculum.semesters.some((semester) => semester.course_units.some((unit) => unit.id === selectedAssignment.subject.course_unit.id)))
+    );
 
     const addRoom = (event: React.FormEvent) => {
         event.preventDefault();
@@ -22,7 +30,7 @@ export default function Timetable({ campuses, rooms, assignments, currentYearId 
     };
     const addSlot = (event: React.FormEvent) => {
         event.preventDefault();
-        slotForm.post(route('admin.timetable.entries.store'), { onSuccess: () => slotForm.reset('subject_teacher_assignment_id', 'room_id') });
+        slotForm.post(route('admin.timetable.entries.store'), { onSuccess: () => slotForm.reset('subject_teacher_assignment_id', 'class_id', 'room_id') });
     };
 
     return (
@@ -36,8 +44,12 @@ export default function Timetable({ campuses, rooms, assignments, currentYearId 
                     <form onSubmit={addSlot} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h2 className="flex items-center gap-2 font-semibold text-slate-800"><CalendarDays className="h-5 w-5 text-indigo-600" />Ajouter un cours</h2>
                         <label className="block text-sm font-medium text-slate-700">Matière, enseignant et année
-                            <select required value={slotForm.data.subject_teacher_assignment_id} onChange={(e) => slotForm.setData('subject_teacher_assignment_id', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300"><option value="">Sélectionner une affectation</option>{yearAssignments.map((assignment) => <option key={assignment.id} value={assignment.id}>{assignment.subject.code} — {assignment.subject.name} · {assignment.teacher.name}</option>)}</select>
+                            <select required value={slotForm.data.subject_teacher_assignment_id} onChange={(e) => slotForm.setData({ ...slotForm.data, subject_teacher_assignment_id: e.target.value, class_id: '' })} className="mt-1 w-full rounded-lg border-slate-300"><option value="">Sélectionner une affectation</option>{yearAssignments.map((assignment) => <option key={assignment.id} value={assignment.id}>{assignment.subject.code} — {assignment.subject.name} · {assignment.teacher.name}</option>)}</select>
                             {slotForm.errors.subject_teacher_assignment_id && <span className="mt-1 block text-xs text-red-600">{slotForm.errors.subject_teacher_assignment_id}</span>}
+                        </label>
+                        <label className="block text-sm font-medium text-slate-700">Groupe concerné
+                            <select value={slotForm.data.class_id} onChange={(e) => slotForm.setData('class_id', e.target.value)} disabled={!selectedAssignment} className="mt-1 w-full rounded-lg border-slate-300 disabled:bg-slate-100"><option value="">Cours commun à tous les groupes</option>{compatibleGroups.map((group) => <option key={group.id} value={group.id}>{group.program.code} · {group.level_code} · {group.code} — {group.name}</option>)}</select>
+                            {slotForm.errors.class_id && <span className="mt-1 block text-xs text-red-600">{slotForm.errors.class_id}</span>}
                         </label>
                         <label className="block text-sm font-medium text-slate-700">Salle
                             <select required value={slotForm.data.room_id} onChange={(e) => slotForm.setData('room_id', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300"><option value="">Sélectionner une salle</option>{rooms.filter((room) => room.is_active !== false).map((room) => <option key={room.id} value={room.id}>{room.code} — {room.name} ({room.campus?.name}, {room.capacity} places)</option>)}</select>

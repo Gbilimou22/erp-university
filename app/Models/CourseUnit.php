@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class CourseUnit extends Model
 {
@@ -32,5 +33,11 @@ class CourseUnit extends Model
     public function subjects(): HasMany
     {
         return $this->hasMany(Subject::class);
+    }
+
+    public function curriculumSemesters(): BelongsToMany
+    {
+        return $this->belongsToMany(CurriculumSemester::class, 'curriculum_course_units')
+            ->withPivot('is_required')->withTimestamps();
     }
 }

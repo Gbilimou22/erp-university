@@ -18,14 +18,25 @@ interface AcademicYear {
     is_current: boolean;
 }
 
+interface AcademicGroup {
+    id: string;
+    program_id: string;
+    academic_year_id: number;
+    level_code: string;
+    code: string;
+    name: string;
+    capacity: number;
+    enrollments_count: number;
+}
+
 interface Props {
-    auth?: { user: any };
     departments: Department[];
     academicYears: AcademicYear[];
     currentYear: AcademicYear | null;
+    groups: AcademicGroup[];
 }
 
-export default function CreateStudent({ auth, departments = [], academicYears = [], currentYear }: Props) {
+export default function CreateStudent({ departments = [], academicYears = [], currentYear, groups = [] }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         first_name: '',
         last_name: '',
@@ -37,6 +48,7 @@ export default function CreateStudent({ auth, departments = [], academicYears = 
         program_id: '',
         academic_year_id: String(currentYear?.id ?? academicYears[0]?.id ?? ''),
         level: 'L1',
+        class_id: '',
     });
 
     const submit = (event: React.FormEvent) => {
@@ -47,10 +59,15 @@ export default function CreateStudent({ auth, departments = [], academicYears = 
     const availablePrograms = departments.find(
         (department) => String(department.id) === data.department_id
     )?.programs ?? [];
+    const availableGroups = groups.filter((group) =>
+        group.program_id === data.program_id
+        && String(group.academic_year_id) === data.academic_year_id
+        && group.level_code === data.level
+        && group.enrollments_count < group.capacity
+    );
 
     return (
         <AuthenticatedLayout
-            user={auth?.user}
             header={
                 <div className="flex items-center justify-between">
                     <h2 className="font-semibold text-xl text-slate-800 leading-tight">
@@ -161,7 +178,7 @@ export default function CreateStudent({ auth, departments = [], academicYears = 
                                 <select
                                     required
                                     value={data.department_id}
-                                    onChange={(e) => setData({ ...data, department_id: e.target.value, program_id: '' })}
+                                    onChange={(e) => setData({ ...data, department_id: e.target.value, program_id: '', class_id: '' })}
                                     className="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
                                 >
                                     <option value="">Choisir un département</option>
@@ -181,7 +198,7 @@ export default function CreateStudent({ auth, departments = [], academicYears = 
                                     required
                                     disabled={!data.department_id || availablePrograms.length === 0}
                                     value={data.program_id}
-                                    onChange={(e) => setData('program_id', e.target.value)}
+                                    onChange={(e) => setData({ ...data, program_id: e.target.value, class_id: '' })}
                                     className="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100"
                                 >
                                     <option value="">
@@ -202,7 +219,7 @@ export default function CreateStudent({ auth, departments = [], academicYears = 
                                 <select
                                     required
                                     value={data.academic_year_id}
-                                    onChange={(e) => setData('academic_year_id', e.target.value)}
+                                    onChange={(e) => setData({ ...data, academic_year_id: e.target.value, class_id: '' })}
                                     className="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
                                 >
                                     <option value="">Choisir une année</option>
@@ -220,7 +237,7 @@ export default function CreateStudent({ auth, departments = [], academicYears = 
                                 <label className="block text-sm font-medium text-slate-700">Niveau</label>
                                 <select
                                     value={data.level}
-                                    onChange={(e) => setData('level', e.target.value)}
+                                    onChange={(e) => setData({ ...data, level: e.target.value, class_id: '' })}
                                     className="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500"
                                 >
                                     {['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'M1', 'M2', 'D1', 'D2', 'D3'].map((level) => (
@@ -228,6 +245,22 @@ export default function CreateStudent({ auth, departments = [], academicYears = 
                                     ))}
                                 </select>
                                 {errors.level && <span className="text-xs text-red-600 mt-1 block">{errors.level}</span>}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700">Groupe pédagogique (facultatif)</label>
+                                <select
+                                    value={data.class_id}
+                                    onChange={(e) => setData('class_id', e.target.value)}
+                                    disabled={!availableGroups.length}
+                                    className="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-slate-100"
+                                >
+                                    <option value="">{availableGroups.length ? 'Affecter plus tard' : 'Aucun groupe disponible'}</option>
+                                    {availableGroups.map((group) => (
+                                        <option key={group.id} value={group.id}>{group.code} — {group.name} ({group.enrollments_count}/{group.capacity})</option>
+                                    ))}
+                                </select>
+                                {errors.class_id && <span className="text-xs text-red-600 mt-1 block">{errors.class_id}</span>}
                             </div>
                         </div>
 

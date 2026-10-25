@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
+use App\Models\ClassGroup;
 use App\Models\AuditEvent;
 use App\Models\Department;
 use App\Models\Enrollment;
@@ -16,6 +17,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -75,6 +78,7 @@ class StudentController extends Controller
             'departments' => Department::with(['faculty:id,name', 'programs:id,department_id,name,code'])->orderBy('name')->get(['id', 'faculty_id', 'name', 'code']),
             'academicYears' => AcademicYear::select('id', 'name', 'is_current')->orderByDesc('start_date')->get(),
             'currentYear' => AcademicYear::where('is_current', true)->first(['id', 'name']),
+            'groups' => ClassGroup::query()->withCount('enrollments')->orderBy('code')->get(['id', 'program_id', 'academic_year_id', 'level_code', 'code', 'name', 'capacity']),
         ]);
     }
 
@@ -98,6 +102,7 @@ class StudentController extends Controller
             'program_id' => ['required', 'exists:programs,id'],
             'academic_year_id' => ['required', 'exists:academic_years,id'],
             'level' => ['required', 'regex:/^(L[1-7]|M[1-2]|D[1-3])$/'],
+            'class_id' => ['nullable', 'exists:classes,id'],
         ]);
 
         $department = Department::with('faculty')->findOrFail($validated['department_id']);
@@ -108,6 +113,20 @@ class StudentController extends Controller
         $temporaryPassword = Str::password(16, true, true, false);
 
         $student = DB::transaction(function () use ($validated, $department, $temporaryPassword) {
+            $classGroup = null;
+            if (!empty($validated['class_id'])) {
+                $classGroup = ClassGroup::query()->lockForUpdate()->findOrFail($validated['class_id']);
+                    if (!(
+                    (string) $classGroup->program_id === (string) $validated['program_id']
+                    && (int) $classGroup->academic_year_id === (int) $validated['academic_year_id']
+                        && $classGroup->level_code === strtoupper($validated['level'])
+                    )) {
+                        throw ValidationException::withMessages(['class_id' => 'Le groupe ne correspond pas à la filière, l’année et au niveau sélectionnés.']);
+                    }
+                if ($classGroup->enrollments()->count() >= $classGroup->capacity) {
+                        throw ValidationException::withMessages(['class_id' => 'Ce groupe a atteint sa capacité maximale.']);
+                }
+            }
             $user = User::create([
                 'name' => trim($validated['first_name'].' '.$validated['last_name']),
                 'email' => $validated['email'],
@@ -141,6 +160,7 @@ class StudentController extends Controller
                 'student_id' => $student->id,
                 'faculty_id' => $department->faculty_id,
                 'program_id' => $validated['program_id'],
+                'class_id' => $classGroup?->id,
                 'academic_year_id' => $validated['academic_year_id'],
                 'level' => $validated['level'],
                 'status' => 'active',
@@ -178,7 +198,114 @@ class StudentController extends Controller
         $this->authorize('view', $student);
 
         $student->load(['user', 'department.faculty', 'enrollments.academicYear', 'enrollments.program']);
-
         return Inertia::render('Admin/Students/Show', ['student' => $student]);
+    }
+
+    public function edit(Student $student): Response
+    {
+        $this->authorize('update', $student);
+
+        $student->load(['department', 'enrollments' => fn ($query) => $query->latest('id')->limit(1), 'enrollments.program', 'enrollments.academicYear', 'enrollments.classGroup']);
+
+        return Inertia::render('Admin/Students/Edit', [
+            'student' => $student,
+            'departments' => Department::with(['faculty:id,name', 'programs:id,department_id,name,code'])->orderBy('name')->get(['id', 'faculty_id', 'name', 'code']),
+            'academicYears' => AcademicYear::select('id', 'name', 'is_current')->orderByDesc('start_date')->get(),
+            'groups' => ClassGroup::query()->withCount('enrollments')->orderBy('code')->get(['id', 'program_id', 'academic_year_id', 'level_code', 'code', 'name', 'capacity']),
+        ]);
+    }
+
+    public function update(Request $request, Student $student): RedirectResponse
+    {
+        $this->authorize('update', $student);
+        $enrollment = $student->enrollments()->latest('id')->firstOrFail();
+
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('students', 'email')->ignore($student->id), Rule::unique('users', 'email')->ignore($student->user_id)],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'birth_date' => ['required', 'date', 'before:today'],
+            'gender' => ['required', 'in:M,F'],
+            'department_id' => ['required', 'exists:departments,id'],
+            'program_id' => ['required', 'exists:programs,id'],
+            'academic_year_id' => ['required', 'exists:academic_years,id'],
+            'level' => ['required', 'regex:/^(L[1-7]|M[1-2]|D[1-3])$/'],
+            'class_id' => ['nullable', 'exists:classes,id'],
+        ]);
+
+        $department = Department::with('faculty')->findOrFail($validated['department_id']);
+        $program = Program::whereKey($validated['program_id'])->where('department_id', $department->id)->firstOrFail();
+
+        DB::transaction(function () use ($validated, $student, $enrollment, $department, $program): void {
+            $classGroup = null;
+            if (!empty($validated['class_id'])) {
+                $classGroup = ClassGroup::query()->lockForUpdate()->findOrFail($validated['class_id']);
+                if ((string) $classGroup->program_id !== (string) $program->id
+                    || (int) $classGroup->academic_year_id !== (int) $validated['academic_year_id']
+                    || $classGroup->level_code !== strtoupper($validated['level'])) {
+                    throw ValidationException::withMessages(['class_id' => 'Le groupe ne correspond pas à la filière, l’année et au niveau sélectionnés.']);
+                }
+                $currentGroupOccupancy = $classGroup->enrollments()->whereKeyNot($enrollment->id)->count();
+                if ($currentGroupOccupancy >= $classGroup->capacity) {
+                    throw ValidationException::withMessages(['class_id' => 'Ce groupe a atteint sa capacité maximale.']);
+                }
+            }
+
+            $before = ['student' => $student->only(['first_name', 'last_name', 'email', 'phone', 'department_id', 'status']), 'enrollment' => $enrollment->only(['program_id', 'academic_year_id', 'level', 'class_id'])];
+            $student->update([
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'] ?? null,
+                'birth_date' => $validated['birth_date'],
+                'gender' => $validated['gender'],
+                'department_id' => $department->id,
+            ]);
+            $student->user?->update(['name' => trim($validated['first_name'].' '.$validated['last_name']), 'email' => $validated['email']]);
+            $enrollment->update([
+                'faculty_id' => $department->faculty_id,
+                'program_id' => $program->id,
+                'academic_year_id' => $validated['academic_year_id'],
+                'level' => strtoupper($validated['level']),
+                'class_id' => $classGroup?->id,
+            ]);
+
+            AuditEvent::create([
+                'actor_id' => request()->user()?->id,
+                'action' => 'student.updated',
+                'auditable_type' => Student::class,
+                'auditable_id' => $student->id,
+                'before' => $before,
+                'after' => ['student' => $student->fresh()->only(['first_name', 'last_name', 'email', 'phone', 'department_id', 'status']), 'enrollment' => $enrollment->fresh()->only(['program_id', 'academic_year_id', 'level', 'class_id'])],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        });
+
+        return redirect()->route('admin.students.show', $student)->with('success', 'Dossier étudiant modifié.');
+    }
+
+    public function destroy(Student $student): RedirectResponse
+    {
+        $this->authorize('delete', $student);
+
+        DB::transaction(function () use ($student): void {
+            $student->update(['status' => 'archived']);
+            $student->user?->update(['is_active' => false]);
+
+            AuditEvent::create([
+                'actor_id' => request()->user()?->id,
+                'action' => 'student.archived',
+                'auditable_type' => Student::class,
+                'auditable_id' => $student->id,
+                'before' => ['status' => 'active'],
+                'after' => ['status' => 'archived', 'account_disabled' => true],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        });
+
+        return redirect()->route('admin.students.index')->with('success', 'Étudiant archivé; son historique académique est conservé.');
     }
 }

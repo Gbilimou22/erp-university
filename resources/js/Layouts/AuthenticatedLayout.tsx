@@ -1,224 +1,132 @@
 import UniversityLogo from '@/Components/UniversityLogo';
-import Dropdown from '@/Components/Dropdown';
-import NavLink from '@/Components/NavLink';
-import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link, usePage } from '@inertiajs/react';
-import { PropsWithChildren, ReactNode, useState } from 'react';
-import { LogOut } from 'lucide-react';
+import { PropsWithChildren, ReactNode } from 'react';
+import {
+    BookOpen,
+    Building2,
+    CalendarDays,
+    GraduationCap,
+    LayoutDashboard,
+    LogOut,
+    ShieldCheck,
+    Users,
+    UsersRound,
+} from 'lucide-react';
 
 export default function Authenticated({
     header,
     children,
 }: PropsWithChildren<{ header?: ReactNode }>) {
     const user = usePage().props.auth.user;
-    const isAdmin = user.role?.toLowerCase() === 'admin';
+    const role = (user.role ?? 'admin').toLowerCase();
+    const isAdmin = role === 'admin';
+    const isStudent = role === 'student';
+    const isTeacher = role === 'teacher';
+    const isParent = role === 'parent';
 
-    const [showingNavigationDropdown, setShowingNavigationDropdown] =
-        useState(false);
+    const navItems = [
+        ...(isAdmin ? [
+            { label: 'Tableau de bord', href: route('dashboard'), active: route().current('dashboard') || route().current('admin.dashboard'), icon: LayoutDashboard },
+            { label: 'Structure académique', href: route('admin.academic.index'), active: route().current('admin.academic.*'), icon: Building2 },
+            { label: 'Étudiants', href: route('admin.students.index'), active: route().current('admin.students.*'), icon: Users },
+            { label: 'Enseignants', href: route('admin.teachers.index'), active: route().current('admin.teachers.*') || route().current('admin.teaching.*'), icon: GraduationCap },
+        ] : []),
+        ...(isStudent ? [
+            { label: 'Tableau de bord', href: route('student.dashboard'), active: route().current('student.dashboard'), icon: LayoutDashboard },
+            { label: 'Mon emploi du temps', href: route('student.timetable'), active: route().current('student.timetable'), icon: CalendarDays },
+            { label: 'Mon groupe', href: route('student.group'), active: route().current('student.group'), icon: UsersRound },
+        ] : []),
+        ...(isTeacher ? [
+            { label: 'Tableau de bord', href: route('teacher.dashboard'), active: route().current('teacher.dashboard'), icon: LayoutDashboard },
+            { label: 'Mes matières', href: route('teacher.dashboard'), active: route().current('teacher.dashboard'), icon: BookOpen },
+            { label: 'Mes groupes', href: route('teacher.dashboard'), active: route().current('teacher.dashboard'), icon: UsersRound },
+        ] : []),
+        ...(isParent ? [
+            { label: 'Tableau de bord', href: route('parent.dashboard'), active: route().current('parent.dashboard'), icon: LayoutDashboard },
+            { label: 'Suivi élève', href: route('parent.dashboard'), active: route().current('parent.dashboard'), icon: ShieldCheck },
+            { label: 'Documents', href: route('parent.dashboard'), active: route().current('parent.dashboard'), icon: BookOpen },
+        ] : []),
+    ];
 
     return (
-        <div className="min-h-screen bg-slate-100">
-            <nav className="border-b border-slate-200 bg-white">
-                <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16">
-                        <div className="flex">
-                            <div className="flex items-center shrink-0">
-                                <Link href="/">
-                                    <UniversityLogo />
-                                </Link>
-                            </div>
-
-                            {/* --- NAVIGATION DESKTOP --- */}
-                            <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                                <NavLink
-                                    href={route('dashboard')}
-                                    active={route().current('dashboard') || route().current('admin.dashboard')}
-                                >
-                                    Tableau de bord
-                                </NavLink>
-
-                                {isAdmin && <>
-                                {/* Structure Académique */}
-                                <NavLink
-                                    href={route('admin.academic.index')}
-                                    active={route().current('admin.academic.*')}
-                                >
-                                    Structure académique
-                                </NavLink>
-
-                                {/* NOUVEAU LIEN : Gestion des Étudiants */}
-                                <NavLink
-                                    href={route('admin.students.index')}
-                                    active={route().current('admin.students.*')}
-                                >
-                                    Gestion des Étudiants
-                                </NavLink>
-                                <NavLink href={route('admin.teachers.index')} active={route().current('admin.teachers.*') || route().current('admin.teaching.*')}>
-                                    Gestion des enseignants
-                                </NavLink>
-                                </>}
-                            </div>
+        <div className="min-h-screen bg-slate-100 lg:flex">
+            <aside className="w-full bg-slate-900 text-slate-100 lg:w-72 lg:min-h-screen lg:shrink-0">
+                <div className="flex items-center justify-between border-b border-slate-800 px-4 py-5 lg:justify-start">
+                    <Link href={route('dashboard')} className="flex items-center gap-3">
+                        <div className="rounded-lg bg-white/10 p-2">
+                            <UniversityLogo />
                         </div>
-
-                        <div className="hidden sm:ms-6 sm:flex sm:items-center">
-                            <div className="relative ms-3">
-                                <Dropdown>
-                                    <Dropdown.Trigger>
-                                        <span className="inline-flex rounded-md">
-                                            <button
-                                                type="button"
-                                                className="inline-flex items-center px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out bg-white border border-transparent rounded-md hover:text-gray-700 focus:outline-none"
-                                            >
-                                                {user.name}
-
-                                                <svg
-                                                    className="-me-0.5 ms-2 h-4 w-4"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                        </span>
-                                    </Dropdown.Trigger>
-
-                                    <Dropdown.Content>
-                                        <Dropdown.Link
-                                            href={route('profile.edit')}
-                                        >
-                                            Profil
-                                        </Dropdown.Link>
-                                        <Dropdown.Link
-                                            href={route('logout')}
-                                            method="post"
-                                            as="button"
-                                        >
-                                            <span className="inline-flex items-center gap-2"><LogOut className="h-4 w-4" />Déconnexion</span>
-                                        </Dropdown.Link>
-                                    </Dropdown.Content>
-                                </Dropdown>
-                            </div>
+                        <div className="leading-tight">
+                            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">ERP</p>
+                            <p className="text-sm font-semibold text-white">Université</p>
                         </div>
-
-                        <div className="flex items-center -me-2 sm:hidden">
-                            <button
-                                onClick={() =>
-                                    setShowingNavigationDropdown(
-                                        (previousState) => !previousState,
-                                    )
-                                }
-                                className="inline-flex items-center justify-center p-2 text-gray-400 transition duration-150 ease-in-out rounded-md hover:bg-gray-100 hover:text-gray-500 focus:bg-gray-100 focus:text-gray-500 focus:outline-none"
-                            >
-                                <svg
-                                    className="w-6 h-6"
-                                    stroke="currentColor"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        className={
-                                            !showingNavigationDropdown
-                                                ? 'inline-flex'
-                                                : 'hidden'
-                                        }
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M4 6h16M4 12h16M4 18h16"
-                                    />
-                                    <path
-                                        className={
-                                            showingNavigationDropdown
-                                                ? 'inline-flex'
-                                                : 'hidden'
-                                        }
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
+                    </Link>
                 </div>
 
-                {/* --- NAVIGATION MOBILE --- */}
-                <div
-                    className={
-                        (showingNavigationDropdown ? 'block' : 'hidden') +
-                        ' sm:hidden'
-                    }
-                >
-                    <div className="pt-2 pb-3 space-y-1">
-                        {isAdmin && <>
-                        <ResponsiveNavLink
-                            href={route('dashboard')}
-                                    active={route().current('dashboard') || route().current('admin.dashboard')}
+                <nav className="space-y-1 px-3 py-5">
+                    {navItems.map(({ label, href, active, icon: Icon }) => (
+                        <Link
+                            key={label}
+                            href={href}
+                            className={[
+                                'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                                active
+                                    ? 'bg-slate-800 text-white shadow-sm'
+                                    : 'text-slate-300 hover:bg-slate-800/80 hover:text-white',
+                            ].join(' ')}
                         >
-                            Tableau de bord
-                        </ResponsiveNavLink>
+                            <Icon className="h-4 w-4" />
+                            {label}
+                        </Link>
+                    ))}
+                </nav>
 
-                        <ResponsiveNavLink
-                            href={route('admin.academic.index')}
-                            active={route().current('admin.academic.*')}
-                        >
-                            Structure académique
-                        </ResponsiveNavLink>
-
-                        {/* NOUVEAU LIEN MOBILE : Gestion des Étudiants */}
-                        <ResponsiveNavLink
-                            href={route('admin.students.index')}
-                            active={route().current('admin.students.*')}
-                        >
-                            Gestion des Étudiants
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink href={route('admin.teachers.index')} active={route().current('admin.teachers.*') || route().current('admin.teaching.*')}>
-                            Gestion des enseignants
-                        </ResponsiveNavLink>
-                        </>}
+                <div className="mt-auto border-t border-slate-800 p-4">
+                    <div className="rounded-xl bg-slate-800/80 p-3">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Connecté</p>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                            <div>
+                                <p className="font-medium text-white">{user.name}</p>
+                                <p className="text-xs text-slate-400">{user.email}</p>
+                            </div>
+                            <div className="rounded-full bg-emerald-500/20 p-2 text-emerald-300">
+                                <UsersRound className="h-4 w-4" />
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="pt-4 pb-1 border-t border-gray-200">
-                        <div className="px-4">
-                            <div className="text-base font-medium text-gray-800">
-                                {user.name}
-                            </div>
-                            <div className="text-sm font-medium text-gray-500">
-                                {user.email}
-                            </div>
-                        </div>
-
-                        <div className="mt-3 space-y-1">
-                            <ResponsiveNavLink href={route('profile.edit')}>
-                                Profil
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                method="post"
-                                href={route('logout')}
-                                as="button"
-                            >
-                                <span className="inline-flex items-center gap-2"><LogOut className="h-4 w-4" />Déconnexion</span>
-                            </ResponsiveNavLink>
-                        </div>
+                    <div className="mt-4 space-y-2">
+                        <Link
+                            href={route('profile.edit')}
+                            className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800"
+                        >
+                            <ShieldCheck className="h-4 w-4" />
+                            Profil
+                        </Link>
+                        <Link
+                            href={route('logout')}
+                            method="post"
+                            as="button"
+                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-500"
+                        >
+                            <LogOut className="h-4 w-4" />
+                            Déconnexion
+                        </Link>
                     </div>
                 </div>
-            </nav>
+            </aside>
 
-            {header && (
-                <header className="border-b border-slate-200 bg-white">
-                    <div className="px-4 py-6 mx-auto max-w-7xl sm:px-6 lg:px-8">
-                        {header}
-                    </div>
-                </header>
-            )}
+            <div className="flex min-w-0 flex-1 flex-col">
+                {header && (
+                    <header className="border-b border-slate-200 bg-white">
+                        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                            {header}
+                        </div>
+                    </header>
+                )}
 
-            <main>{children}</main>
+                <main className="min-w-0 flex-1">{children}</main>
+            </div>
         </div>
     );
 }

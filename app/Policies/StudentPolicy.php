@@ -22,4 +22,13 @@ class StudentPolicy
     {
         return $user->isAdmin();
     }
+    public function update(User $user, Student $student): bool
+    {
+        return $user->isAdmin();
+    }
+
+    public function delete(User $user, Student $student): bool
+    {
+        return $user->isAdmin();
+    }
 }

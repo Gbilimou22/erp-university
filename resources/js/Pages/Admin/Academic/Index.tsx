@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackButton from '@/Components/BackButton';
-import { Building2, Landmark, Plus, Folder, X, Loader2, Edit2, Trash2, MapPin } from 'lucide-react';
+import { Building2, Landmark, Plus, Folder, X, Loader2, Edit2, Trash2, MapPin, Layers3 } from 'lucide-react';
 
 interface Department {
     id: number | string;
@@ -217,17 +217,20 @@ export default function Index({ campuses = [] }: Props) {
                         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">Structure académique</h1>
                         <p className="mt-1 text-sm text-slate-500">Configuration et organisation hiérarchique de l’université.</p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setEditingCampus(null);
-                            campusForm.reset();
-                            setShowCampusModal(true);
-                        }}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200"
-                    >
-                        <Plus className="h-4 w-4" /> Ajouter un campus
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                        <Link href={route('admin.curricula.index')} className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50"><Layers3 className="h-4 w-4" />Maquettes pédagogiques</Link>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setEditingCampus(null);
+                                campusForm.reset();
+                                setShowCampusModal(true);
+                            }}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200"
+                        >
+                            <Plus className="h-4 w-4" /> Ajouter un campus
+                        </button>
+                    </div>
                 </div>
             }
         >

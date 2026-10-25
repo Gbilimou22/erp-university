@@ -91,7 +91,11 @@ class AdministrativeCreationFlowsTest extends TestCase
         ]);
 
         $response->assertRedirect(route('admin.timetable.entries.index'));
-        $this->assertDatabaseHas('timetable_entries', ['room_id' => $room->id, 'weekday' => 1]);
+        $this->assertDatabaseHas('timetable_entries', [
+            'subject_teacher_assignment_id' => $assignment->id,
+            'room_id' => $room->id,
+            'weekday' => 1,
+        ]);
         $this->get(route('admin.timetable.entries.index'))->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Teachers/Entries')
             ->has('entries', 1)

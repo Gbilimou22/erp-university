@@ -102,6 +102,10 @@ class TeachingController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'credits' => ['required', 'integer', 'min:1', 'max:60'],
         ]);
+
+        if ($courseUnit->curriculumSemesters()->whereHas('curriculum.program.department', fn ($query) => $query->where('faculty_id', '!=', $data['faculty_id']))->exists()) {
+            return back()->withErrors(['faculty_id' => 'Retirez d’abord cette UE des maquettes rattachées à sa faculté actuelle.']);
+        }
         $courseUnit->update([...$data, 'code' => strtoupper($data['code'])]);
 
         return back()->with('success', 'Unité d’enseignement mise à jour.');
@@ -109,6 +113,9 @@ class TeachingController extends Controller
 
     public function destroyCourseUnit(CourseUnit $courseUnit): RedirectResponse
     {
+        if ($courseUnit->curriculumSemesters()->exists()) {
+            return back()->withErrors(['courseUnit' => 'Retirez d’abord cette UE des maquettes pédagogiques.']);
+        }
         if ($courseUnit->subjects()->whereHas('grades')->exists()) {
             return back()->withErrors(['courseUnit' => 'Cette UE contient des matières avec des notes et ne peut pas être supprimée.']);
         }

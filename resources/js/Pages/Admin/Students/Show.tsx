@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Head } from '@inertiajs/react';
-import { Mail, Phone, GraduationCap } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { Mail, Phone, GraduationCap, Pencil } from 'lucide-react';
 import BackButton from '@/Components/BackButton';
 
 interface Student {
@@ -48,7 +48,8 @@ export default function ShowStudent({ student, flash }: Props) {
                 )}
                 <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-5">
-                        <div><p className="font-mono text-sm text-slate-500">{student.registration_number}</p><h1 className="mt-1 text-2xl font-bold text-slate-800">{student.first_name} {student.last_name}</h1><p className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">{student.status}</p></div>
+                        <div><p className="font-mono text-sm text-slate-500">{student.registration_number}</p><h1 className="mt-1 text-2xl font-bold text-slate-800">{student.first_name} {student.last_name}</h1><p className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-medium ${student.status === 'archived' ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 text-emerald-700'}`}>{student.status === 'archived' ? 'Archivé' : student.status}</p></div>
+                        <Link href={route('admin.students.edit', student.id)} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white"><Pencil className="h-4 w-4" />Modifier le dossier</Link>
                         <div className="space-y-2 text-sm text-slate-600"><p className="flex items-center gap-2"><Mail className="h-4 w-4" />{student.email}</p><p className="flex items-center gap-2"><Phone className="h-4 w-4" />{student.phone || 'Téléphone non renseigné'}</p></div>
                     </div>
                     <div className="grid gap-6 pt-5 sm:grid-cols-2">

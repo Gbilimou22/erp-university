@@ -89,9 +89,9 @@ class AcademicYearController extends Controller
 
     public function destroy(AcademicYear $academicYear): RedirectResponse
     {
-        if ($academicYear->enrollments()->exists() || $academicYear->grades()->exists()) {
+        if ($academicYear->enrollments()->exists() || $academicYear->grades()->exists() || $academicYear->curricula()->exists()) {
             return redirect()->back()->withErrors([
-                'academic_year' => 'Cette année est déjà utilisée par des inscriptions ou des notes et ne peut pas être supprimée.',
+                'academic_year' => 'Cette année est déjà utilisée par des inscriptions, des notes ou des maquettes pédagogiques et ne peut pas être supprimée.',
             ]);
         }
 

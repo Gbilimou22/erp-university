@@ -14,6 +14,7 @@ class Enrollment extends Model
         'student_id',
         'faculty_id',
         'program_id',
+        'class_id',
         'academic_year_id',
         'level',
         'status',
@@ -38,6 +39,11 @@ class Enrollment extends Model
     public function program(): BelongsTo
     {
         return $this->belongsTo(Program::class);
+    }
+
+    public function classGroup(): BelongsTo
+    {
+        return $this->belongsTo(ClassGroup::class, 'class_id');
     }
 
     /**

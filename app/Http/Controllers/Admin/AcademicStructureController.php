@@ -216,9 +216,10 @@ class AcademicStructureController extends Controller
 
     public function destroyProgram(Program $program)
     {
-        if (DB::table('classes')->where('program_id', $program->id)->exists()
+        if ($program->curricula()->exists()
+            || DB::table('classes')->where('program_id', $program->id)->exists()
             || DB::table('enrollments')->where('program_id', $program->id)->exists()) {
-            return back()->withErrors(['program' => 'Cette filière est utilisée par des classes ou des inscriptions et ne peut pas être supprimée.']);
+            return back()->withErrors(['program' => 'Cette filière est utilisée par une maquette, une classe ou une inscription et ne peut pas être supprimée.']);
         }
 
         $program->delete();
