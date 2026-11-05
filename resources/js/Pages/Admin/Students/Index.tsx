@@ -1,7 +1,6 @@
 import React from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import { Search, UserPlus, Pencil, Archive } from 'lucide-react';
-import BackButton from '@/Components/BackButton';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 interface Student {
@@ -53,7 +52,6 @@ export default function StudentsIndex({ students, faculties, departments, progra
         >
             <Head title="Étudiants" />
             <main className="mx-auto min-h-screen max-w-7xl space-y-6 bg-slate-50 p-6">
-                <BackButton href={route('admin.dashboard')} label="Retour au tableau de bord" />
                 <form onSubmit={(event) => { event.preventDefault(); applyFilter('search', search); }} className="grid gap-3 rounded-xl border bg-white p-4 md:grid-cols-7">
                     <label className="relative md:col-span-2"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nom, e-mail ou matricule" className="w-full rounded-lg border-slate-300 pl-9" /></label>
                     <select value={filters.faculty_id ?? ''} onChange={(e) => applyFilter('faculty_id', e.target.value)} className="rounded-lg border-slate-300"><option value="">Toutes les facultés</option>{faculties.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>

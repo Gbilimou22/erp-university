@@ -1,86 +1,54 @@
-import React from 'react';
-import { Head, Link } from '@inertiajs/react';
+﻿import { Head, Link, useForm } from '@inertiajs/react';
+import { ArrowRight, BookOpen, CalendarDays, ClipboardCheck, ClipboardList, GraduationCap, UsersRound } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { BookOpen, CalendarDays, GraduationCap, LogOut, UsersRound } from 'lucide-react';
 
-type Subject = { id: number; code: string; name: string; coefficient: string | number; course_unit?: { code: string; name: string } };
+type Subject = { id: number; assignment_id: number; code: string; name: string; planned_hours: number | string | null; completed_hours: number; course_unit?: { code: string; name: string } };
+type Assessment = { id: number; title: string; status: string; starts_at: string; ends_at: string; attempts_count: number; subject: { code: string; name: string } };
 
-export default function TeacherDashboard({ academicYear, subjects = [] }: { academicYear: { id: number; name: string } | null; subjects: Subject[] }) {
-    const quickActions = [
-        {
-            title: 'Mes matières',
-            description: subjects.length > 0 ? `${subjects.length} matière${subjects.length > 1 ? 's' : ''} assignée${subjects.length > 1 ? 's' : ''}` : 'Aucune matière assignée pour le moment',
-            href: '#subjects',
-            icon: BookOpen,
-            active: true,
-        },
-        {
-            title: 'Mon emploi du temps',
-            description: 'Voir mon planning de cours et mes créneaux.',
-            href: '#',
-            icon: CalendarDays,
-            active: false,
-        },
-        {
-            title: 'Mes groupes',
-            description: 'Consulter les groupes pédagogiques associés.',
-            href: '#',
-            icon: UsersRound,
-            active: false,
-        },
+function CourseProgress({ course }: { course: Subject }) {
+    const form = useForm({ assignment_id: course.assignment_id, planned_hours: course.planned_hours ? String(course.planned_hours) : '', delivered_on: new Date().toISOString().slice(0, 10), hours: '1', topic: '' });
+    const planned = Number(form.data.planned_hours || 0);
+    const completed = Number(course.completed_hours || 0);
+    const percent = planned > 0 ? Math.min(100, Math.round((completed / planned) * 100)) : 0;
+
+    const submit = (event: React.FormEvent) => {
+        event.preventDefault();
+        form.post(route('teacher.progress.sessions.store'), { preserveScroll: true, onSuccess: () => form.reset('hours', 'topic') });
+    };
+
+    return <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">{course.code}{course.course_unit ? ` · UE ${course.course_unit.code}` : ''}</p><h3 className="mt-1 font-bold text-slate-900">{course.name}</h3></div><p className="text-lg font-bold text-indigo-700">{planned ? `${percent} %` : 'À définir'}</p></div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`Progression de ${course.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${percent}%` }} /></div>
+        <p className="mt-2 text-sm text-slate-500">{completed.toLocaleString('fr-FR')} h dispensée{completed > 1 ? 's' : ''}{planned ? ` sur ${planned.toLocaleString('fr-FR')} h prévues` : ' · définissez le volume prévu pour démarrer le suivi'}</p>
+        <details className="mt-4 border-t border-slate-100 pt-3"><summary className="cursor-pointer text-sm font-semibold text-indigo-700">Enregistrer une séance dispensée</summary>
+            <form onSubmit={submit} className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-xs font-medium text-slate-600">Volume total prévu (heures)<input required type="number" min="1" max="5000" step="0.25" value={form.data.planned_hours} onChange={event => form.setData('planned_hours', event.target.value)} className="mt-1 w-full rounded-lg border-slate-300 text-sm" />{form.errors.planned_hours && <span className="mt-1 block text-xs text-red-600">{form.errors.planned_hours}</span>}</label>
+                <label className="text-xs font-medium text-slate-600">Date de la séance<input required type="date" max={new Date().toISOString().slice(0, 10)} value={form.data.delivered_on} onChange={event => form.setData('delivered_on', event.target.value)} className="mt-1 w-full rounded-lg border-slate-300 text-sm" />{form.errors.delivered_on && <span className="mt-1 block text-xs text-red-600">{form.errors.delivered_on}</span>}</label>
+                <label className="text-xs font-medium text-slate-600">Durée dispensée (heures)<input required type="number" min="0.25" max="12" step="0.25" value={form.data.hours} onChange={event => form.setData('hours', event.target.value)} className="mt-1 w-full rounded-lg border-slate-300 text-sm" />{form.errors.hours && <span className="mt-1 block text-xs text-red-600">{form.errors.hours}</span>}</label>
+                <label className="text-xs font-medium text-slate-600">Sujet traité<input required maxLength={200} value={form.data.topic} onChange={event => form.setData('topic', event.target.value)} placeholder="Ex. Introduction au chapitre 2" className="mt-1 w-full rounded-lg border-slate-300 text-sm" />{form.errors.topic && <span className="mt-1 block text-xs text-red-600">{form.errors.topic}</span>}</label>
+                <div className="flex justify-end sm:col-span-2"><button disabled={form.processing} className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:opacity-50">{form.processing ? 'Enregistrement…' : 'Valider la séance'}</button></div>
+            </form>
+        </details>
+    </article>;
+}
+
+export default function TeacherDashboard({ academicYear, subjects = [], assessments = [] }: { academicYear: { id: number; name: string } | null; subjects: Subject[]; assessments?: Assessment[] }) {
+    const activeAssessments = assessments.filter(assessment => assessment.status === 'launched').length;
+    const modules = [
+        { title: 'Mes matières', description: 'Consultez vos cours et unités d’enseignement.', href: route('teacher.subjects.index'), icon: BookOpen, metric: `${subjects.length} affectée${subjects.length === 1 ? '' : 's'}` },
+        { title: 'Emploi du temps', description: 'Vos cours, groupes, salles et horaires.', href: route('teacher.timetable'), icon: CalendarDays, metric: 'Planning pédagogique' },
+        { title: 'Saisie des notes', description: 'Enregistrez les notes de vos étudiants.', href: route('teacher.grades.index'), icon: ClipboardCheck, metric: 'Notes sur 10' },
+        { title: 'Évaluations', description: 'Créez des épreuves et suivez les copies.', href: route('teacher.assessments.index'), icon: ClipboardList, metric: `${activeAssessments} en cours` },
+        { title: 'Mes groupes', description: 'Retrouvez les étudiants inscrits à vos cours.', href: route('teacher.groups.index'), icon: UsersRound, metric: 'Groupes affectés' },
     ];
 
-    return (
-        <AuthenticatedLayout header={
-            <div className="flex items-center justify-between gap-4">
-                <h2 className="text-xl font-semibold text-slate-800">Espace enseignant</h2>
-                <Link
-                    href={route('logout')}
-                    method="post"
-                    as="button"
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                    <LogOut className="h-4 w-4" />
-                    Déconnexion
-                </Link>
-            </div>
-        }>
-            <Head title="Espace enseignant" />
-            <main className="min-h-screen space-y-6 bg-slate-50 p-6">
-                <header className="rounded-2xl bg-gradient-to-r from-indigo-700 to-blue-600 p-6 text-white shadow-sm">
-                    <p className="text-sm text-blue-100">Portail enseignant</p>
-                    <h1 className="mt-1 text-2xl font-bold">Bienvenue dans votre espace</h1>
-                    <p className="mt-2 text-sm text-blue-100">Retrouvez vos enseignements, votre planning et les groupes pédagogiques associés.</p>
-                </header>
-
-                <section className="grid gap-4 md:grid-cols-3">
-                    {quickActions.map(({ title, description, href, icon: Icon, active }) => (
-                        <div key={title} className={`rounded-2xl border bg-white p-5 shadow-sm ${active ? 'border-indigo-200' : 'border-slate-200 opacity-80'}`}>
-                            <div className="flex items-center justify-between gap-3">
-                                <div className={`rounded-xl p-2.5 ${active ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
-                                    <Icon className="h-5 w-5" />
-                                </div>
-                                <span className={`text-[11px] font-medium uppercase tracking-[0.14em] ${active ? 'text-indigo-700' : 'text-slate-400'}`}>
-                                    {active ? 'Actif' : 'Suivant'}
-                                </span>
-                            </div>
-                            <h2 className="mt-4 text-lg font-semibold text-slate-900">{title}</h2>
-                            <p className="mt-2 text-sm leading-relaxed text-slate-500">{description}</p>
-                            <a href={href} className={`mt-4 inline-flex text-sm font-medium ${active ? 'text-indigo-700' : 'text-slate-500'}`}>
-                                {active ? 'Voir la liste' : 'Bientôt disponible'}
-                            </a>
-                        </div>
-                    ))}
-                </section>
-
-                <section id="subjects" className="rounded-xl border bg-white p-5">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <div><h2 className="flex items-center gap-2 text-lg font-semibold text-slate-800"><BookOpen className="h-5 w-5 text-indigo-600" />Mes matières</h2><p className="mt-1 text-sm text-slate-500">{academicYear ? `Année universitaire ${academicYear.name}` : 'Aucune année académique active.'}</p></div>
-                        <span className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">{subjects.length} matière{subjects.length > 1 ? 's' : ''}</span>
-                    </div>
-                    {!academicYear ? <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">L’administration n’a pas encore défini l’année académique en cours.</p> : subjects.length === 0 ? <div className="rounded-lg border border-dashed p-8 text-center"><GraduationCap className="mx-auto h-8 w-8 text-slate-400" /><p className="mt-2 font-medium text-slate-700">Aucune matière ne vous est affectée pour cette année.</p><p className="mt-1 text-sm text-slate-500">Contactez l’administration pour vérifier votre répartition pédagogique.</p></div> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{subjects.map((subject) => <article key={subject.id} className="rounded-xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:shadow-sm"><p className="font-mono text-xs text-indigo-700">{subject.code}</p><h3 className="mt-1 font-semibold text-slate-800">{subject.name}</h3><p className="mt-2 text-sm text-slate-500">{subject.course_unit?.code} — {subject.course_unit?.name}</p><p className="mt-3 text-xs text-slate-500">Coefficient : {subject.coefficient}</p></article>)}</div>}
-                </section>
-            </main>
-        </AuthenticatedLayout>
-    );
+    return <AuthenticatedLayout header={<div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">Portail pédagogique</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Tableau de bord</h1></div>}>
+        <Head title="Espace enseignant" />
+        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-7 sm:px-6 lg:px-8"><div className="mx-auto max-w-7xl space-y-7">
+            <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-indigo-800 p-7 text-white shadow-lg sm:p-10"><div className="absolute -right-10 -top-16 h-64 w-64 rounded-full bg-indigo-400/10 blur-2xl" /><div className="relative flex flex-wrap items-end justify-between gap-6"><div className="max-w-2xl"><p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-indigo-100"><GraduationCap className="h-4 w-4" />Espace enseignant</p><h2 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">Bienvenue dans votre espace</h2><p className="mt-3 text-sm leading-6 text-indigo-100 sm:text-base">Accédez rapidement à vos matières, vos groupes et au suivi pédagogique de vos étudiants.</p></div><div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur"><p className="text-xs font-medium uppercase tracking-wider text-indigo-200">Année universitaire</p><p className="mt-1 text-lg font-semibold">{academicYear?.name ?? 'Non définie'}</p></div></div></section>
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Matières affectées</p><p className="mt-2 text-3xl font-bold text-slate-900">{subjects.length}</p><Link href={route('teacher.subjects.index')} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700">Voir mes matières <ArrowRight className="h-4 w-4" /></Link></article><article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Évaluations à suivre</p><p className="mt-2 text-3xl font-bold text-slate-900">{assessments.length}</p><Link href={route('teacher.assessments.index')} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700">Ouvrir les évaluations <ArrowRight className="h-4 w-4" /></Link></article><article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Épreuves lancées</p><p className="mt-2 text-3xl font-bold text-slate-900">{activeAssessments}</p><span className="mt-3 block text-sm text-slate-500">Sur l’année en cours</span></article><article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Année active</p><p className="mt-2 truncate text-xl font-bold text-slate-900">{academicYear?.name ?? '—'}</p><span className="mt-3 block text-sm text-slate-500">Contexte pédagogique actuel</span></article></section><section><div className="mb-4"><h2 className="text-lg font-bold text-slate-900">Progression des enseignements</h2><p className="mt-1 text-sm text-slate-500">Suivez les heures réellement dispensées par matière et consignez chaque séance.</p></div>{subjects.length === 0 ? <p className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-500">Aucune matière affectée pour cette année universitaire.</p> : <div className="grid gap-4 xl:grid-cols-2">{subjects.map(course => <CourseProgress key={course.assignment_id} course={course} />)}</div>}</section>
+            <section><div className="mb-4"><h2 className="text-lg font-bold text-slate-900">Accès rapide</h2><p className="mt-1 text-sm text-slate-500">Chaque espace s’ouvre sur sa propre page.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{modules.map(({ title, description, href, icon: Icon, metric }) => <Link key={title} href={href} className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"><div className="flex items-start justify-between gap-4"><div className="rounded-xl bg-indigo-50 p-3 text-indigo-700 transition group-hover:bg-indigo-700 group-hover:text-white"><Icon className="h-5 w-5" /></div><ArrowRight className="h-5 w-5 text-slate-300 transition group-hover:translate-x-1 group-hover:text-indigo-700" /></div><h3 className="mt-4 font-bold text-slate-900">{title}</h3><p className="mt-1 text-sm leading-5 text-slate-500">{description}</p><p className="mt-4 border-t border-slate-100 pt-3 text-xs font-semibold uppercase tracking-wide text-indigo-700">{metric}</p></Link>)}</div></section>
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4"><div><h2 className="font-bold text-slate-900">Évaluations récentes</h2><p className="mt-1 text-sm text-slate-500">Un aperçu des évaluations à lancer ou des copies à suivre.</p></div><Link href={route('teacher.assessments.index')} className="text-sm font-semibold text-indigo-700">Tout voir</Link></div>{assessments.length === 0 ? <p className="p-5 text-sm text-slate-500">Aucune évaluation créée pour cette année.</p> : <div className="divide-y divide-slate-100">{assessments.slice(0, 4).map(item => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><p className="font-semibold text-slate-800">{item.subject.code} · {item.title}</p><p className="mt-1 text-sm text-slate-500">{new Date(item.starts_at).toLocaleString()} · {item.attempts_count} tentative{item.attempts_count === 1 ? '' : 's'}</p></div><Link href={route('teacher.assessments.results', item.id)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-indigo-200 hover:text-indigo-700">Voir les copies</Link></div>)}</div>}</section>
+        </div></main>
+    </AuthenticatedLayout>;
 }

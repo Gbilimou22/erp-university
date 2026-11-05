@@ -11,9 +11,18 @@ use App\Http\Controllers\Admin\TeacherController;
 use App\Http\Controllers\Admin\TimetableController;
 use App\Http\Controllers\Admin\CurriculumController;
 use App\Http\Controllers\Admin\ClassGroupController;
+use App\Http\Controllers\Admin\AccountRecoveryController;
+use App\Http\Controllers\Admin\GradePublicationController;
+use App\Http\Controllers\Teacher\AssessmentController as TeacherAssessmentController;
+use App\Http\Controllers\Teacher\TeachingProgressController;
+use App\Http\Controllers\Teacher\WorkspaceController as TeacherWorkspaceController;
+use App\Http\Controllers\Student\AssessmentController as StudentAssessmentController;
 use App\Http\Controllers\Auth\FirstLoginPasswordController;
 use App\Http\Controllers\Student\TimetableController as StudentTimetableController;
 use App\Http\Controllers\Student\GroupController as StudentGroupController;
+use App\Http\Controllers\Student\GradeController as StudentGradeController;
+use App\Http\Controllers\GradeController;
+use App\Http\Controllers\Teacher\TimetableController as TeacherTimetableController;
 use App\Http\Middleware\RequirePasswordChange;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -49,6 +58,11 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         // Tableau de bord Admin
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
+        Route::get('/account-recovery', [AccountRecoveryController::class, 'index'])->name('account-recovery.index');
+        Route::post('/account-recovery/{user}/reset', [AccountRecoveryController::class, 'reset'])->name('account-recovery.reset');
+        Route::get('/grades/publication', [GradePublicationController::class, 'index'])->name('grades.index');
+        Route::post('/grades/publication', [GradePublicationController::class, 'publish'])->name('grades.publish');
+
         // Enseignants
         Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
         Route::get('/teachers/create', [TeacherController::class, 'create'])->name('teachers.create');
@@ -69,6 +83,7 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
             Route::get('/', 'index')->name('index');
             Route::get('/{classGroup}', 'show')->name('show');
             Route::post('/', 'store')->name('store');
+            Route::post('/{classGroup}/students/{student}/assign', 'assignStudent')->name('students.assign');
             Route::post('/{classGroup}/students/{student}/move', 'moveStudent')->name('students.move');
             Route::delete('/{classGroup}', 'destroy')->name('destroy');
         });
@@ -100,8 +115,7 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         });
 
         // Gestion des Étudiants
-        Route::resource('students', StudentController::class)->only(['index', 'create', 'store', 'show']);
-            Route::resource('students', StudentController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
+        Route::resource('students', StudentController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
 
         // Années Académiques
         Route::prefix('academic-years')->name('academic-years.')->group(function () {
@@ -151,24 +165,58 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         // Emploi du Temps Étudiant
         Route::get('/timetable', [StudentTimetableController::class, 'index'])->name('timetable');
         Route::get('/group', [StudentGroupController::class, 'show'])->name('group');
+        Route::get('/grades', [StudentGradeController::class, 'index'])->name('grades.index');
+        Route::get('/assessments', [StudentAssessmentController::class, 'index'])->name('assessments.index');
+        Route::get('/assessments/{assessment}', [StudentAssessmentController::class, 'show'])->name('assessments.show');
+        Route::post('/assessments/{assessment}/start', [StudentAssessmentController::class, 'start'])->name('assessments.start');
+        Route::post('/assessments/{assessment}/submit', [StudentAssessmentController::class, 'submit'])->name('assessments.submit');
+        Route::put('/assessments/{assessment}/answers', [StudentAssessmentController::class, 'saveAnswers'])->name('assessments.answers.save');
     });
 
     // --- ESPACE ENSEIGNANT (/teacher/...) ---
     Route::prefix('teacher')->name('teacher.')->middleware('role:teacher')->group(function () {
+        Route::post('/progress/sessions', [TeachingProgressController::class, 'storeSession'])->name('progress.sessions.store');
+        Route::get('/assessments', [TeacherAssessmentController::class, 'index'])->name('assessments.index');
+        Route::post('/assessments', [TeacherAssessmentController::class, 'store'])->name('assessments.store');
+        Route::post('/assessments/{assessment}/launch', [TeacherAssessmentController::class, 'launch'])->name('assessments.launch');
+        Route::get('/assessments/{assessment}/results', [TeacherAssessmentController::class, 'results'])->name('assessments.results');
+        Route::post('/assessments/{assessment}/attempts/{attempt}/correct', [TeacherAssessmentController::class, 'correct'])->name('assessments.correct');
+        Route::get('/timetable', [TeacherTimetableController::class, 'index'])->name('timetable');
+        Route::get('/grades', [GradeController::class, 'index'])->name('grades.index');
+        Route::post('/grades', [GradeController::class, 'store'])->name('grades.store');
+        Route::get('/subjects', [TeacherWorkspaceController::class, 'subjects'])->name('subjects.index');
+        Route::get('/groups', [TeacherWorkspaceController::class, 'groups'])->name('groups.index');
+
         Route::get('/dashboard', function () {
             $user = request()->user();
             $currentYear = \App\Models\AcademicYear::where('is_current', true)->first();
             $subjects = $currentYear
-                ? $user->taughtSubjects()
-                ->wherePivot('academic_year_id', $currentYear->id)
-                ->with('courseUnit:id,code,name')
-                ->orderBy('name')
-                ->get(['subjects.id', 'subjects.course_unit_id', 'subjects.code', 'subjects.name', 'subjects.coefficient'])
+                ? \App\Models\SubjectTeacherAssignment::query()
+                    ->with('subject.courseUnit:id,code,name')
+                    ->withSum('teachingSessions as completed_hours', 'hours')
+                    ->where('teacher_id', $user->id)
+                    ->where('academic_year_id', $currentYear->id)
+                    ->get()
+                    ->map(fn ($assignment) => [
+                        'assignment_id' => $assignment->id,
+                        'id' => $assignment->subject->id,
+                        'code' => $assignment->subject->code,
+                        'name' => $assignment->subject->name,
+                        'course_unit' => $assignment->subject->courseUnit?->only(['code', 'name']),
+                        'planned_hours' => $assignment->planned_hours,
+                        'completed_hours' => (float) ($assignment->completed_hours ?? 0),
+                    ])
+                : collect();
+            $assessments = $currentYear
+                ? \App\Models\Assessment::query()->with('subject:id,code,name')->withCount('attempts')
+                    ->where('teacher_id', $user->id)->where('academic_year_id', $currentYear->id)
+                    ->whereIn('status', ['draft', 'launched'])->orderBy('starts_at')->limit(5)->get()
                 : collect();
 
             return Inertia::render('Teacher/Dashboard', [
                 'academicYear' => $currentYear?->only(['id', 'name']),
                 'subjects' => $subjects,
+                'assessments' => $assessments,
             ]);
         })->name('dashboard');
     });
@@ -178,6 +226,18 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         Route::get('/dashboard', function () {
             return Inertia::render('Parent/Dashboard');
         })->name('dashboard');
+        Route::get('/tracking', function () {
+            return Inertia::render('Parent/Feature', [
+                'title' => 'Suivi de l’élève',
+                'description' => 'Le suivi des notes, présences et informations de scolarité sera regroupé dans cet espace.',
+            ]);
+        })->name('tracking');
+        Route::get('/documents', function () {
+            return Inertia::render('Parent/Feature', [
+                'title' => 'Documents',
+                'description' => 'Les relevés, attestations et documents partagés apparaîtront dans cet espace.',
+            ]);
+        })->name('documents');
     });
 
     // --- PROFIL UTILISATEUR ---

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowRight, BookUser, GraduationCap, LogOut, ShieldCheck } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -8,22 +7,22 @@ const cards = [
         title: 'Suivi des élèves',
         detail: 'Consultez l’état académique et le groupe de vos enfants.',
         icon: GraduationCap,
-        href: '#',
-        active: false,
+        href: route('parent.tracking'),
+        active: true,
     },
     {
         title: 'Documents',
         detail: 'Accédez aux relevés, attestations et pièces administratives.',
         icon: BookUser,
-        href: '#',
-        active: false,
+        href: route('parent.documents'),
+        active: true,
     },
     {
         title: 'Sécurité',
         detail: 'Vérifiez les informations de compte et la confidentialité.',
         icon: ShieldCheck,
-        href: '#',
-        active: false,
+        href: route('profile.edit'),
+        active: true,
     },
 ];
 
@@ -59,23 +58,24 @@ export default function ParentDashboard() {
                     </header>
 
                     <section className="grid gap-4 md:grid-cols-3">
-                        {cards.map(({ title, detail, icon: Icon, active }) => (
-                            <div
+                        {cards.map(({ title, detail, icon: Icon, href, active }) => (
+                            <Link
                                 key={title}
-                                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm opacity-80"
+                                href={href}
+                                className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-md"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="rounded-xl bg-indigo-50 p-2.5 text-indigo-700">
                                         <Icon className="h-5 w-5" />
                                     </div>
-                                    {active && <ArrowRight className="h-4 w-4 text-indigo-700" />}
+                                    {active && <ArrowRight className="h-4 w-4 text-violet-700 transition group-hover:translate-x-1" />}
                                 </div>
                                 <h3 className="mt-4 text-lg font-semibold text-slate-900">{title}</h3>
                                 <p className="mt-2 text-sm leading-relaxed text-slate-500">{detail}</p>
                                 <div className="mt-4 border-t border-slate-100 pt-3 text-xs font-medium text-slate-400">
                                     Bientôt disponible
                                 </div>
-                            </div>
+                            </Link>
                         ))}
                     </section>
                 </div>

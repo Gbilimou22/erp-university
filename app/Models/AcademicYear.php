@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class AcademicYear extends Model
 {
@@ -35,9 +36,9 @@ class AcademicYear extends Model
     /**
      * Une année académique contient plusieurs notes enregistrées.
      */
-    public function grades(): HasMany
+    public function grades(): HasManyThrough
     {
-        return $this->hasMany(Grade::class);
+        return $this->hasManyThrough(Grade::class, Enrollment::class, 'academic_year_id', 'enrollment_id', 'id', 'id');
     }
 
     public function curricula(): HasMany

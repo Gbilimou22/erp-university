@@ -11,6 +11,10 @@ type Subject = { id: number; code: string; name: string; course_unit: { code: st
 export default function Assignments({ academicYears, currentYearId, teachers, subjects }: { academicYears: Year[]; currentYearId?: number; teachers: Teacher[]; subjects: Subject[] }) {
     const [yearId, setYearId] = React.useState(String(currentYearId ?? academicYears[0]?.id ?? ''));
     const form = useForm({ subject_id: '', teacher_id: '', academic_year_id: String(currentYearId ?? academicYears[0]?.id ?? '') });
+    const selectedSubject = subjects.find((subject) => String(subject.id) === form.data.subject_id);
+    const duplicateAssignment = Boolean(selectedSubject?.teachers.some((teacher) =>
+        String(teacher.id) === form.data.teacher_id && String(teacher.pivot.academic_year_id) === form.data.academic_year_id
+    ));
 
     const assign = (event: React.FormEvent) => {
         event.preventDefault();
@@ -47,7 +51,8 @@ export default function Assignments({ academicYears, currentYearId, teachers, su
                     <label className="text-sm font-medium text-slate-700">Année académique
                         <select required value={form.data.academic_year_id} onChange={(e) => { form.setData('academic_year_id', e.target.value); setYearId(e.target.value); }} className="mt-1 w-full rounded-lg border-slate-300"><option value="">Choisir une année</option>{academicYears.map((year) => <option key={year.id} value={year.id}>{year.name}{year.is_current ? ' (en cours)' : ''}</option>)}</select>
                     </label>
-                    <div className="flex items-end"><button disabled={form.processing || !teachers.length || !subjects.length || !academicYears.length} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-50"><UserPlus className="h-4 w-4" />{form.processing ? 'Affectation…' : 'Affecter'}</button></div>
+                    <div className="flex items-end"><button disabled={form.processing || duplicateAssignment || !teachers.length || !subjects.length || !academicYears.length} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-50"><UserPlus className="h-4 w-4" />{form.processing ? 'Affectation…' : duplicateAssignment ? 'Déjà affecté' : 'Affecter'}</button></div>
+                    {duplicateAssignment && <p role="status" className="text-sm text-amber-800 md:col-span-2 xl:col-span-4">Cet enseignant est déjà affecté à cette matière pour l’année sélectionnée.</p>}
                     {Object.values(form.errors).length > 0 && <p role="alert" className="text-sm text-red-600 md:col-span-2 xl:col-span-4">{Object.values(form.errors).join(' ')}</p>}
                     {teachers.length === 0 && <p className="flex flex-wrap items-center gap-2 text-sm text-amber-800 md:col-span-2 xl:col-span-4"><span>Aucun compte enseignant actif. Il faut créer un compte avant de pouvoir affecter une matière.</span><Link href={route('admin.teachers.index')} className="inline-flex items-center gap-1 font-semibold underline"><UserPlus className="h-4 w-4" />Créer un compte enseignant</Link></p>}
                 </form>

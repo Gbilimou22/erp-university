@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { Mail, Phone, GraduationCap, Pencil } from 'lucide-react';
 import BackButton from '@/Components/BackButton';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 interface Student {
     id: number;
@@ -34,7 +35,7 @@ export default function ShowStudent({ student, flash }: Props) {
     };
 
     return (
-        <>
+        <AuthenticatedLayout header={<div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Administration · Scolarité</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Dossier étudiant</h1><p className="mt-1 text-sm text-slate-500">{student.first_name} {student.last_name} · {student.registration_number}</p></div>}>
             <Head title={`Étudiant ${student.registration_number}`} />
             <main className="mx-auto min-h-screen max-w-4xl space-y-6 bg-slate-50 p-6">
                 <BackButton href={route('admin.students.index')} label="Retour à la liste des étudiants" />
@@ -58,6 +59,6 @@ export default function ShowStudent({ student, flash }: Props) {
                     </div>
                 </section>
             </main>
-        </>
+        </AuthenticatedLayout>
     );
 }

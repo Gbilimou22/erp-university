@@ -1,6 +1,6 @@
 import React from 'react';
 import { Head, Link } from '@inertiajs/react';
-import { BookOpen, CalendarDays, CreditCard, FileText, GraduationCap, ArrowRight, UsersRound } from 'lucide-react';
+import { BookOpen, CalendarDays, CreditCard, FileText, GraduationCap, ArrowRight, UsersRound, ClipboardList } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 interface StudentProfile {
@@ -34,8 +34,15 @@ export default function StudentDashboard({ student }: { student: StudentProfile 
             title: 'Mes résultats',
             detail: 'Consultez vos notes et résultats d\'examens publiés.',
             icon: BookOpen,
-            href: '#',
-            active: false,
+            href: route('student.grades.index'),
+            active: true,
+        },
+        {
+            title: 'Évaluations en cours',
+            detail: 'Consultez et passez les évaluations ouvertes pour vos matières.',
+            icon: ClipboardList,
+            href: route('student.assessments.index'),
+            active: true,
         },
         {
             title: 'Ma situation financière',
@@ -68,7 +75,8 @@ export default function StudentDashboard({ student }: { student: StudentProfile 
             }
         >
             <Head title="Portail étudiant" />
-            <main className="mx-auto max-w-7xl space-y-8 p-6">
+            <main className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-7 sm:px-6 lg:px-8"><div className="mx-auto max-w-7xl space-y-7">
+                <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-emerald-950 to-emerald-800 p-7 text-white shadow-lg sm:p-9"><div className="flex flex-wrap items-end justify-between gap-6"><div><p className="text-sm text-emerald-200">Portail étudiant</p><h2 className="mt-2 text-3xl font-bold tracking-tight">{student ? `Bonjour, ${student.first_name}` : 'Votre espace universitaire'}</h2><p className="mt-2 text-sm text-emerald-100">Retrouvez votre parcours, vos cours et vos résultats depuis vos espaces dédiés.</p></div>{student && <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4"><p className="text-xs uppercase tracking-wider text-emerald-200">Matricule</p><p className="mt-1 font-semibold">{student.registration_number}</p></div>}</div></section>
                 {student && (
                     <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
                         <div>
@@ -144,7 +152,7 @@ export default function StudentDashboard({ student }: { student: StudentProfile 
                         Gérer mon compte & mot de passe
                     </Link>
                 </div>
-            </main>
+            </div></main>
         </AuthenticatedLayout>
     );
 }

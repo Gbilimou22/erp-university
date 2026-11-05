@@ -12,33 +12,22 @@ class StudentFee extends Model
     use HasFactory;
 
     protected $fillable = [
-        'student_id',
-        'academic_year_id',
-        'total_amount',
-        'paid_amount',
+        'enrollment_id',
+        'title',
+        'amount',
         'due_date',
-        'status', // PENDING, PARTIAL, PAID, OVERDUE
     ];
 
     protected $casts = [
-        'total_amount' => 'float',
-        'paid_amount' => 'float',
+        'amount' => 'decimal:2',
         'due_date' => 'date',
     ];
 
-    public function student(): BelongsTo
+    public function enrollment(): BelongsTo
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Enrollment::class);
     }
 
-    public function academicYear(): BelongsTo
-    {
-        return $this->belongsTo(AcademicYear::class);
-    }
-
-    /**
-     * Un échéancier a plusieurs versements/paiements enregistrés.
-     */
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);

@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class SubjectTeacherAssignment extends Model
 {
     protected $table = 'subject_teacher_assignments';
-    protected $fillable = ['subject_id', 'teacher_id', 'academic_year_id'];
+    protected $fillable = ['subject_id', 'teacher_id', 'academic_year_id', 'planned_hours'];
 
     public function subject(): BelongsTo { return $this->belongsTo(Subject::class); }
     public function teacher(): BelongsTo { return $this->belongsTo(User::class, 'teacher_id'); }
     public function academicYear(): BelongsTo { return $this->belongsTo(AcademicYear::class); }
     public function timetableEntries(): HasMany { return $this->hasMany(TimetableEntry::class); }
+    public function teachingSessions(): HasMany { return $this->hasMany(TeachingSession::class); }
 }

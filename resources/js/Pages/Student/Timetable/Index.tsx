@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import BackButton from '@/Components/BackButton';
 import {
     Calendar as CalendarIcon,
     ChevronLeft,
@@ -12,7 +13,6 @@ import {
     LayoutGrid,
     List,
     X,
-    ArrowLeft
 } from 'lucide-react';
 
 export interface TimetableEntry {
@@ -116,20 +116,14 @@ export default function StudentTimetable({
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-slate-800">Emploi du Temps</h2>
-                    <Link
-                        href={route('student.dashboard')}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 transition"
-                    >
-                        <ArrowLeft className="h-3.5 w-3.5" /> Retour au tableau de bord
-                    </Link>
-                </div>
+                <h2 className="text-xl font-semibold text-slate-800">Emploi du Temps</h2>
             }
         >
             <Head title="Mon Emploi du Temps" />
+            <BackButton href={route('student.dashboard')} label="Retour au tableau de bord" />
 
             <div className="min-h-screen p-4 space-y-6 bg-slate-50 sm:p-6">
+                <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-slate-950 via-emerald-950 to-emerald-800 p-6 text-white shadow-sm"><div><p className="text-sm text-emerald-200">Organisation de la semaine</p><h2 className="mt-2 text-2xl font-bold">Mon emploi du temps</h2><p className="mt-1 text-sm text-emerald-100">Consultez vos cours, salles et enseignants.</p></div><CalendarIcon className="h-8 w-8 text-emerald-100" /></section>
                 {/* En-tête de la page */}
                 <div className="flex flex-col gap-4 p-5 bg-white border shadow-sm md:flex-row md:items-center md:justify-between rounded-2xl border-slate-200">
                     <div>

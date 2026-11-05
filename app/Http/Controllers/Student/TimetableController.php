@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicYear;
 use App\Models\TimetableEntry;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -32,10 +33,14 @@ class TimetableController extends Controller
         }
 
         // 2. Récupérer la dernière inscription active
-        $enrollment = $student->enrollments()
-            ->with(['program', 'academicYear', 'classGroup'])
-            ->latest('id')
-            ->first();
+        $activeEnrollments = $student->enrollments()
+            ->where('status', 'active')
+            ->with(['program', 'academicYear', 'classGroup']);
+        $currentAcademicYear = AcademicYear::query()->where('is_current', true)->first();
+        $enrollment = $currentAcademicYear
+            ? (clone $activeEnrollments)->where('academic_year_id', $currentAcademicYear->id)->latest('id')->first()
+            : null;
+        $enrollment ??= $activeEnrollments->latest('id')->first();
 
         if (!$enrollment) {
             return Inertia::render('Student/Timetable/Index', [

@@ -11,47 +11,39 @@ class Grade extends Model
     use HasFactory;
 
     protected $fillable = [
-        'student_id',
+        'enrollment_id',
         'subject_id',
-        'academic_year_id',
         'score',
-        'type', // CC, TP, EXAM, RATTRAPAGE
+        'type',
+        'assessment_label',
         'entered_by',
+        'status',
+        'published_by',
+        'published_at',
     ];
 
     protected $casts = [
-        'score' => 'float',
+        'score' => 'decimal:2',
+        'published_at' => 'datetime',
     ];
 
-    /**
-     * La note appartient à un étudiant.
-     */
-    public function student(): BelongsTo
+    public function enrollment(): BelongsTo
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Enrollment::class);
     }
 
-    /**
-     * La note concerne une matière spécifique.
-     */
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
     }
 
-    /**
-     * La note s'inscrit dans une année académique.
-     */
-    public function academicYear(): BelongsTo
-    {
-        return $this->belongsTo(AcademicYear::class);
-    }
-
-    /**
-     * Utilisateur (enseignant/admin) ayant saisi la note.
-     */
-    public function teacher(): BelongsTo
+    public function enteredBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'entered_by');
+    }
+
+    public function publishedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'published_by');
     }
 }

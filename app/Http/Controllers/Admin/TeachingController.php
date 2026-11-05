@@ -51,12 +51,16 @@ class TeachingController extends Controller
     {
         $data = $request->validate([
             'subject_id' => ['required', 'exists:subjects,id'],
-            'teacher_id' => ['required', Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'teacher')->where('is_active', true))],
+            'teacher_id' => [
+                'required',
+                Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'teacher')->where('is_active', true)),
+                Rule::unique('subject_teacher_assignments', 'teacher_id')
+                    ->where('subject_id', $request->input('subject_id'))
+                    ->where('academic_year_id', $request->input('academic_year_id')),
+            ],
             'academic_year_id' => ['required', 'exists:academic_years,id'],
         ]);
-        Subject::findOrFail($data['subject_id'])->teachers()->syncWithoutDetaching([
-            $data['teacher_id'] => ['academic_year_id' => $data['academic_year_id']],
-        ]);
+        SubjectTeacherAssignment::create($data);
 
         return back()->with('success', 'Enseignant affecté à cette matière pour l’année sélectionnée.');
     }

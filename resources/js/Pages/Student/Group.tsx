@@ -1,6 +1,7 @@
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, BookOpen, CalendarDays, GraduationCap, UsersRound } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import { BookOpen, CalendarDays, GraduationCap, UsersRound } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import BackButton from '@/Components/BackButton';
 
 type Enrollment = {
     level: string;
@@ -14,7 +15,7 @@ export default function StudentGroup({ studentName, enrollment }: { studentName:
         <Head title="Mon groupe" />
         <main className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl space-y-6">
-                <Link href={route('student.dashboard')} className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"><ArrowLeft className="h-4 w-4" />Retour au portail</Link>
+                <BackButton href={route('student.dashboard')} label="Retour au tableau de bord" />
                 {!studentName || !enrollment ? <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">Aucun dossier ou aucune inscription n’est associé à votre compte. Contactez la scolarité.</section> : !enrollment.group ? <section className="rounded-xl border border-slate-200 bg-white p-6"><div className="flex items-center gap-3"><UsersRound className="h-6 w-6 text-emerald-700" /><h2 className="font-semibold text-slate-900">Vous n’êtes pas encore affecté à un groupe</h2></div><p className="mt-2 text-sm text-slate-600">Votre inscription est enregistrée. La scolarité pourra vous affecter à un groupe lorsque la répartition sera prête.</p></section> : <>
                     <section className="rounded-xl border border-emerald-200 bg-emerald-950 p-6 text-white shadow-sm sm:p-8">
                         <div className="flex items-center gap-3 text-emerald-200"><UsersRound className="h-6 w-6" /><span className="text-sm font-semibold uppercase">{enrollment.group.level_code}</span></div>

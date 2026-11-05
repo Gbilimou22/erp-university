@@ -8,6 +8,7 @@ use App\Models\ClassGroup;
 use App\Models\Enrollment;
 use App\Models\Program;
 use App\Models\Student;
+use App\Models\TimetableEntry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,11 +63,72 @@ class ClassGroupController extends Controller
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'capacity', 'level_code']);
 
+        $availableStudents = Enrollment::query()
+            ->with('student:id,registration_number,first_name,last_name,email')
+            ->where('program_id', $classGroup->program_id)
+            ->where('academic_year_id', $classGroup->academic_year_id)
+            ->where('level', $classGroup->level_code)
+            ->where('status', 'active')
+            ->whereNull('class_id')
+            ->orderBy('id')
+            ->get(['id', 'student_id'])
+            ->map(fn (Enrollment $enrollment) => [
+                'id' => $enrollment->student?->id,
+                'registration_number' => $enrollment->student?->registration_number,
+                'name' => trim(($enrollment->student?->first_name ?? '') . ' ' . ($enrollment->student?->last_name ?? '')),
+                'email' => $enrollment->student?->email,
+            ])
+            ->filter(fn (array $student) => $student['id'] !== null)
+            ->values();
+
+        $roomAssignments = TimetableEntry::query()
+            ->with(['room:id,campus_id,code,name', 'room.campus:id,name', 'assignment.subject:id,code,name', 'assignment.teacher:id,name'])
+            ->where('class_id', $classGroup->id)
+            ->whereHas('assignment', fn ($query) => $query->where('academic_year_id', $classGroup->academic_year_id))
+            ->orderBy('weekday')
+            ->orderBy('start_time')
+            ->get();
+
         return Inertia::render('Admin/AcademicGroups/Show', [
             'group' => $classGroup,
             'students' => $students,
             'matchingGroups' => $matchingGroups,
+            'availableStudents' => $availableStudents,
+            'roomAssignments' => $roomAssignments,
         ]);
+    }
+
+    public function assignStudent(Request $request, ClassGroup $classGroup, Student $student): RedirectResponse
+    {
+        DB::transaction(function () use ($classGroup, $student) {
+            $group = ClassGroup::query()->whereKey($classGroup->id)->lockForUpdate()->firstOrFail();
+            $enrollment = Enrollment::query()
+                ->where('student_id', $student->id)
+                ->where('program_id', $group->program_id)
+                ->where('academic_year_id', $group->academic_year_id)
+                ->where('level', $group->level_code)
+                ->where('status', 'active')
+                ->whereNull('class_id')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $enrollment) {
+                throw ValidationException::withMessages([
+                    'student_id' => 'Aucune inscription active sans groupe ne correspond à cette filière, année et niveau.',
+                ]);
+            }
+
+            if ($group->enrollments()->count() >= $group->capacity) {
+                throw ValidationException::withMessages([
+                    'student_id' => 'Ce groupe a atteint sa capacité maximale.',
+                ]);
+            }
+
+            $enrollment->update(['class_id' => $group->id]);
+        });
+
+        return redirect()->route('admin.academic-groups.show', $classGroup)
+            ->with('success', 'L’étudiant a été affecté au groupe ' . $classGroup->code . '.');
     }
 
     public function moveStudent(Request $request, ClassGroup $classGroup, Student $student): RedirectResponse
@@ -81,27 +143,44 @@ class ClassGroupController extends Controller
             ]);
         }
 
-        $newGroup = ClassGroup::query()->lockForUpdate()->findOrFail($data['new_group_id']);
-        $enrollment = $student->enrollments()->where('class_id', $classGroup->id)->latest('id')->first();
+        $newGroupId = $data['new_group_id'];
+        $newGroup = DB::transaction(function () use ($classGroup, $student, $newGroupId) {
+            $groups = ClassGroup::query()
+                ->whereIn('id', [$classGroup->id, $newGroupId])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            $sourceGroup = $groups->get($classGroup->id);
+            $destinationGroup = $groups->get($newGroupId);
+            abort_unless($sourceGroup && $destinationGroup, 404);
 
-        abort_unless($enrollment, 404, 'Cet étudiant n’est pas inscrit dans ce groupe.');
+            $enrollment = $student->enrollments()
+                ->where('class_id', $sourceGroup->id)
+                ->where('academic_year_id', $sourceGroup->academic_year_id)
+                ->latest('id')
+                ->lockForUpdate()
+                ->first();
+            abort_unless($enrollment, 404, 'Cet étudiant n’est pas inscrit dans ce groupe pour cette année.');
 
-        if ($newGroup->program_id !== $classGroup->program_id
-            || (int) $newGroup->academic_year_id !== (int) $classGroup->academic_year_id
-            || $newGroup->level_code !== $classGroup->level_code) {
-            throw ValidationException::withMessages([
-                'new_group_id' => 'Le groupe de destination doit correspondre à la même filière, année et niveau.',
-            ]);
-        }
+            if ($destinationGroup->program_id !== $sourceGroup->program_id
+                || (int) $destinationGroup->academic_year_id !== (int) $sourceGroup->academic_year_id
+                || $destinationGroup->level_code !== $sourceGroup->level_code) {
+                throw ValidationException::withMessages([
+                    'new_group_id' => 'Le groupe de destination doit correspondre à la même filière, année et niveau.',
+                ]);
+            }
 
-        $occupiedSeats = $newGroup->enrollments()->whereKeyNot($enrollment->id)->count();
-        if ($occupiedSeats >= $newGroup->capacity) {
-            throw ValidationException::withMessages([
-                'new_group_id' => 'Ce groupe a atteint sa capacité maximale.',
-            ]);
-        }
+            if ($destinationGroup->enrollments()->whereKeyNot($enrollment->id)->count() >= $destinationGroup->capacity) {
+                throw ValidationException::withMessages([
+                    'new_group_id' => 'Ce groupe a atteint sa capacité maximale.',
+                ]);
+            }
 
-        $enrollment->update(['class_id' => $newGroup->id]);
+            $enrollment->update(['class_id' => $destinationGroup->id]);
+
+            return $destinationGroup;
+        });
 
         return redirect()->route('admin.academic-groups.show', $classGroup)
             ->with('success', 'L’étudiant a été déplacé vers le groupe ' . $newGroup->code . '.');

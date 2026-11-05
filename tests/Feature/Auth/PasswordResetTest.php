@@ -3,8 +3,8 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
@@ -12,62 +12,58 @@ class PasswordResetTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_reset_password_link_screen_can_be_rendered(): void
+    public function test_password_recovery_instructions_can_be_rendered(): void
     {
-        $response = $this->get('/forgot-password');
-
-        $response->assertStatus(200);
+        $this->get('/forgot-password')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Auth/ForgotPassword'));
     }
 
-    public function test_reset_password_link_can_be_requested(): void
+    public function test_guests_cannot_request_an_email_password_reset(): void
     {
         Notification::fake();
-
         $user = User::factory()->create();
 
-        $this->post('/forgot-password', ['email' => $user->email]);
+        $this->post('/forgot-password', ['email' => $user->email])->assertStatus(405);
 
-        Notification::assertSentTo($user, ResetPassword::class);
+        Notification::assertNothingSent();
     }
 
-    public function test_reset_password_screen_can_be_rendered(): void
+    public function test_email_reset_token_routes_are_not_available(): void
     {
-        Notification::fake();
-
-        $user = User::factory()->create();
-
-        $this->post('/forgot-password', ['email' => $user->email]);
-
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
-            $response = $this->get('/reset-password/'.$notification->token);
-
-            $response->assertStatus(200);
-
-            return true;
-        });
+        $this->get('/reset-password/fake-token')->assertNotFound();
+        $this->post('/reset-password', [
+            'token' => 'fake-token',
+            'email' => 'student@example.test',
+            'password' => 'New-password-123',
+            'password_confirmation' => 'New-password-123',
+        ])->assertNotFound();
     }
 
-    public function test_password_can_be_reset_with_valid_token(): void
+    public function test_an_administrator_can_issue_a_temporary_password_without_email(): void
     {
         Notification::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $student = User::factory()->create(['role' => 'student']);
+        $oldPassword = $student->password;
 
-        $user = User::factory()->create();
+        $response = $this->actingAs($admin)
+            ->from(route('admin.account-recovery.index'))
+            ->post(route('admin.account-recovery.reset', $student));
 
-        $this->post('/forgot-password', ['email' => $user->email]);
+        $response->assertRedirect(route('admin.account-recovery.index'))
+            ->assertSessionHas('temporary_password', fn ($password) => is_string($password) && strlen($password) >= 20);
 
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
-            $response = $this->post('/reset-password', [
-                'token' => $notification->token,
-                'email' => $user->email,
-                'password' => 'password',
-                'password_confirmation' => 'password',
-            ]);
-
-            $response
-                ->assertSessionHasNoErrors()
-                ->assertRedirect(route('login'));
-
-            return true;
-        });
+        $temporaryPassword = $response->getSession()->get('temporary_password');
+        $student->refresh();
+        $this->assertNotSame($oldPassword, $student->password);
+        $this->assertTrue(Hash::check($temporaryPassword, $student->password));
+        $this->assertTrue($student->must_change_password);
+        $this->assertDatabaseHas('audit_events', [
+            'actor_id' => $admin->id,
+            'action' => 'account.password_reset_by_admin',
+            'auditable_id' => $student->id,
+        ]);
+        Notification::assertNothingSent();
     }
 }

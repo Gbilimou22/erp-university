@@ -12,16 +12,15 @@ class Payment extends Model
 
     protected $fillable = [
         'student_fee_id',
-        'transaction_reference',
+        'reference_number',
         'amount',
-        'payment_method', // CASH, MOBILE_MONEY, CARD, BANK_TRANSFER
-        'payment_date',
-        'notes',
+        'payment_method',
+        'paid_at',
     ];
 
     protected $casts = [
-        'amount' => 'float',
-        'payment_date' => 'datetime',
+        'amount' => 'decimal:2',
+        'paid_at' => 'datetime',
     ];
 
     public function studentFee(): BelongsTo
