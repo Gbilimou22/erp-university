@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\CourseUnit;
+use App\Models\Department;
 use App\Models\AcademicYear;
 use App\Models\Faculty;
 use App\Models\Subject;
@@ -21,6 +22,7 @@ class TeachingController extends Controller
     {
         return Inertia::render('Admin/Teaching/Index', [
             'faculties' => Faculty::query()->orderBy('name')->get(['id', 'name', 'code']),
+            'departments' => Department::query()->orderBy('name')->get(['id', 'faculty_id', 'name', 'code']),
             'courseUnits' => CourseUnit::query()->with('faculty:id,name,code')->withCount('subjects')
                 ->withCount('subjects')->orderBy('name')->get(),
         ]);
@@ -29,7 +31,8 @@ class TeachingController extends Controller
     public function subjects(): Response
     {
         return Inertia::render('Admin/Teaching/Subjects', [
-            'courseUnits' => CourseUnit::query()->with(['faculty:id,name', 'subjects:id,course_unit_id,code,name,coefficient'])
+            'departments' => Department::query()->orderBy('name')->get(['id', 'faculty_id', 'name', 'code']),
+            'courseUnits' => CourseUnit::query()->with(['faculty:id,name', 'subjects:id,course_unit_id,department_id,code,name,coefficient', 'subjects.department:id,name,code'])
                 ->orderBy('name')->get(['id', 'faculty_id', 'code', 'name', 'credits']),
         ]);
     }
@@ -132,10 +135,12 @@ class TeachingController extends Controller
     {
         $data = $request->validate([
             'course_unit_id' => ['required', 'exists:course_units,id'],
+            'department_id' => ['required', 'exists:departments,id'],
             'code' => ['required', 'string', 'max:30', 'alpha_dash', 'unique:subjects,code'],
             'name' => ['required', 'string', 'max:150'],
             'coefficient' => ['required', 'numeric', 'gt:0', 'max:99.99'],
         ]);
+        $this->ensureDepartmentMatchesCourseUnit((int) $data['department_id'], (int) $data['course_unit_id']);
         Subject::create([...$data, 'code' => strtoupper($data['code'])]);
 
         return redirect()->route('admin.teaching.subjects.index')->with('success', 'Matière (ECUE) créée.');
@@ -145,13 +150,26 @@ class TeachingController extends Controller
     {
         $data = $request->validate([
             'course_unit_id' => ['required', 'exists:course_units,id'],
+            'department_id' => ['required', 'exists:departments,id'],
             'code' => ['required', 'string', 'max:30', 'alpha_dash', Rule::unique('subjects', 'code')->ignore($subject->id)],
             'name' => ['required', 'string', 'max:150'],
             'coefficient' => ['required', 'numeric', 'gt:0', 'max:99.99'],
         ]);
+        $this->ensureDepartmentMatchesCourseUnit((int) $data['department_id'], (int) $data['course_unit_id']);
         $subject->update([...$data, 'code' => strtoupper($data['code'])]);
 
         return redirect()->route('admin.teaching.subjects.index')->with('success', 'Matière mise à jour.');
+    }
+
+    private function ensureDepartmentMatchesCourseUnit(int $departmentId, int $courseUnitId): void
+    {
+        $departmentFacultyId = Department::query()->whereKey($departmentId)->value('faculty_id');
+        $unitFacultyId = CourseUnit::query()->whereKey($courseUnitId)->value('faculty_id');
+        if (! $departmentFacultyId || (int) $departmentFacultyId !== (int) $unitFacultyId) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'department_id' => "Le departement choisi doit appartenir a la faculte de l’UE selectionnee.",
+            ]);
+        }
     }
 
     public function destroySubject(Subject $subject): RedirectResponse

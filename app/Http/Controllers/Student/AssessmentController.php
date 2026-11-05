@@ -29,12 +29,13 @@ class AssessmentController extends Controller
             if (! $facultyId) continue;
             $subjectIds = Subject::query()
                 ->whereHas('courseUnit', fn ($query) => $query->where('faculty_id', $facultyId))
+                ->where(fn ($query) => $query->whereNull('department_id')->orWhere('department_id', $enrollment->program->department_id))
                 ->whereHas('courseUnit.curriculumSemesters.curriculum', fn ($query) => $query
                     ->where('academic_year_id', $enrollment->academic_year_id)
                     ->where('program_id', $enrollment->program_id))
                 ->pluck('subjects.id');
             foreach ($subjectIds as $subjectId) {
-                $eligiblePairs[] = ['year_id' => $enrollment->academic_year_id, 'subject_id' => $subjectId, 'enrollment_id' => $enrollment->id];
+                $eligiblePairs[] = ['year_id' => $enrollment->academic_year_id, 'subject_id' => $subjectId, 'department_id' => $enrollment->program->department_id, 'enrollment_id' => $enrollment->id];
             }
         }
 
@@ -50,7 +51,8 @@ class AssessmentController extends Controller
                 foreach ($eligiblePairs as $pair) {
                     $query->orWhere(fn ($pairQuery) => $pairQuery
                         ->where('academic_year_id', $pair['year_id'])
-                        ->where('subject_id', $pair['subject_id']));
+                        ->where('subject_id', $pair['subject_id'])
+                        ->where(fn ($department) => $department->whereNull('department_id')->orWhere('department_id', $pair['department_id'])));
                 }
             }))
             ->orderBy('ends_at')
@@ -80,7 +82,7 @@ class AssessmentController extends Controller
         $enrollment = $this->eligibleEnrollment($request, $assessment);
         $attempt = AssessmentAttempt::query()->where('assessment_id', $assessment->id)
             ->where('enrollment_id', $enrollment->id)->first();
-        abort_unless($this->isOpen($assessment) || $attempt?->status !== 'in_progress' && $attempt !== null, 404);
+        abort_unless($this->isOpen($assessment) || $attempt !== null, 404);
 
         $deadline = $attempt && $assessment->duration_minutes
             ? min($attempt->started_at->copy()->addMinutes($assessment->duration_minutes), $assessment->ends_at)
@@ -141,32 +143,47 @@ class AssessmentController extends Controller
             $deadline = $assessment->duration_minutes
                 ? min($lockedAttempt->started_at->copy()->addMinutes($assessment->duration_minutes), $assessment->ends_at)
                 : $assessment->ends_at;
-            abort_if(now()->gt($deadline->copy()->addSeconds(15)), 422, 'Le délai de cette évaluation est écoulé.');
-            $this->persistAnswers($lockedAttempt, $answers);
+            $deadlinePassed = now()->gt($deadline);
+            $lateBeyondGrace = now()->gt($deadline->copy()->addSeconds(15));
+            $answersToPersist = $lateBeyondGrace
+                ? $lockedAttempt->answers()->get(['question_id', 'option_id', 'answer_text'])->map(fn (AssessmentAnswer $answer) => [
+                    'question_id' => $answer->question_id,
+                    'option_id' => $answer->option_id,
+                    'answer_text' => $answer->answer_text,
+                ])->all()
+                : $answers;
+            $isAntiCheatViolation = in_array($reason, ['focus_lost', 'tab_hidden', 'navigation'], true);
+            $submissionReason = $isAntiCheatViolation ? $reason : ($deadlinePassed ? 'timeout' : $reason);
+            $this->persistAnswers($lockedAttempt, $answersToPersist);
             $earned = 0.0;
             $maximum = 0.0;
             $hasWrittenQuestions = false;
 
             foreach ($questions as $question) {
+                $maximum += (float) $question->points;
                 if ($question->type === 'direct') {
                     $hasWrittenQuestions = true;
                     continue;
                 }
-                $maximum += (float) $question->points;
-                $answer = collect($answers)->firstWhere('question_id', $question->id);
+                $answer = collect($answersToPersist)->firstWhere('question_id', $question->id);
                 $correctOptionId = $question->options->firstWhere('is_correct', true)?->id;
                 if ($answer && (int) ($answer['option_id'] ?? 0) === (int) $correctOptionId) {
                     $earned += (float) $question->points;
                 }
             }
 
-            $score = ! $hasWrittenQuestions && $maximum > 0 ? round(($earned / $maximum) * 10, 2) : null;
+            $score = $isAntiCheatViolation
+                ? 0
+                : (($submissionReason === 'timeout' || ! $hasWrittenQuestions) && $maximum > 0
+                    ? round(($earned / $maximum) * 10, 2)
+                    : null);
+            $status = $isAntiCheatViolation || ! $hasWrittenQuestions ? 'corrected' : 'submitted';
             $lockedAttempt->forceFill([
                 'submitted_at' => now(),
                 'score' => $score,
-                'status' => $hasWrittenQuestions ? 'submitted' : 'corrected',
-                'submission_reason' => $reason,
-                'focus_violations' => $reason === 'student' ? 0 : 1,
+                'status' => $status,
+                'submission_reason' => $submissionReason,
+                'focus_violations' => $isAntiCheatViolation ? 1 : 0,
             ])->save();
 
             AuditEvent::create([
@@ -174,7 +191,7 @@ class AssessmentController extends Controller
                 'action' => 'assessment.attempt_submitted',
                 'auditable_type' => AssessmentAttempt::class,
                 'auditable_id' => $lockedAttempt->id,
-                'after' => ['status' => $hasWrittenQuestions ? 'submitted' : 'corrected', 'score' => $score, 'submission_reason' => $reason],
+                'after' => ['status' => $status, 'score' => $score, 'submission_reason' => $submissionReason],
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
             ]);
@@ -259,8 +276,10 @@ class AssessmentController extends Controller
         foreach ($enrollments as $enrollment) {
             $facultyId = $enrollment->program?->department?->faculty_id;
             if (! $facultyId) continue;
+            if ($assessment->department_id && (int) $assessment->department_id !== (int) $enrollment->program->department_id) continue;
             $subjectIsInCurriculum = Subject::query()
                 ->whereKey($assessment->subject_id)
+                ->where(fn ($query) => $query->whereNull('department_id')->orWhere('department_id', $enrollment->program->department_id))
                 ->whereHas('courseUnit', fn ($query) => $query->where('faculty_id', $facultyId))
                 ->whereHas('courseUnit.curriculumSemesters.curriculum', fn ($query) => $query
                     ->where('academic_year_id', $assessment->academic_year_id)

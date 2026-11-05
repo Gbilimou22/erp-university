@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AcademicYear;
 use App\Models\Curriculum;
+use App\Models\Department;
 use App\Models\Enrollment;
 use App\Models\Grade;
 use App\Models\Subject;
@@ -22,7 +23,9 @@ class GradeController extends Controller
             return Inertia::render('Teacher/Grades/Index', [
                 'academicYear' => null,
                 'subjects' => [],
+                'departments' => [],
                 'selectedSubjectId' => null,
+                'selectedDepartmentId' => null,
                 'students' => [],
                 'grades' => [],
             ]);
@@ -32,7 +35,7 @@ class GradeController extends Controller
             ->wherePivot('academic_year_id', $academicYear->id)
             ->with('courseUnit:id,faculty_id,code,name')
             ->orderBy('name')
-            ->get(['subjects.id', 'subjects.code', 'subjects.name']);
+            ->get(['subjects.id', 'subjects.course_unit_id', 'subjects.department_id', 'subjects.code', 'subjects.name']);
 
         $subjectId = $request->integer('subject_id') ?: null;
         $selectedSubject = $subjectId
@@ -42,6 +45,16 @@ class GradeController extends Controller
         $eligibleProgramIds = $selectedSubject
             ? $this->eligibleProgramIds($selectedSubject, (int) $academicYear->id)
             : [];
+        $departments = $eligibleProgramIds === []
+            ? collect()
+            : Department::query()
+                ->whereHas('programs', fn ($query) => $query->whereIn('programs.id', $eligibleProgramIds))
+                ->orderBy('name')
+                ->get(['id', 'code', 'name']);
+        $requestedDepartmentId = $request->integer('department_id') ?: null;
+        $selectedDepartmentId = $departments->contains('id', $requestedDepartmentId)
+            ? $requestedDepartmentId
+            : $departments->first()?->id;
 
         $students = $selectedSubject
             ? Enrollment::query()
@@ -49,6 +62,7 @@ class GradeController extends Controller
                 ->where('academic_year_id', $academicYear->id)
                 ->where('status', 'active')
                 ->whereIn('program_id', $eligibleProgramIds)
+                ->whereHas('program', fn ($query) => $query->where('department_id', $selectedDepartmentId))
                 ->whereHas('student')
                 ->orderBy('id')
                 ->get(['id', 'student_id', 'program_id', 'class_id', 'level'])
@@ -66,7 +80,8 @@ class GradeController extends Controller
                 ->whereHas('enrollment', fn ($query) => $query
                     ->where('academic_year_id', $academicYear->id)
                     ->where('status', 'active')
-                    ->whereIn('program_id', $eligibleProgramIds))
+                    ->whereIn('program_id', $eligibleProgramIds)
+                    ->whereHas('program', fn ($query) => $query->where('department_id', $selectedDepartmentId)))
                 ->latest('updated_at')
                 ->get()
             : collect();
@@ -74,7 +89,9 @@ class GradeController extends Controller
         return Inertia::render('Teacher/Grades/Index', [
             'academicYear' => $academicYear->only(['id', 'name']),
             'subjects' => $subjects,
+            'departments' => $departments,
             'selectedSubjectId' => $selectedSubject?->id,
+            'selectedDepartmentId' => $selectedDepartmentId,
             'students' => $students,
             'grades' => $grades,
         ]);
@@ -93,9 +110,16 @@ class GradeController extends Controller
             ->with('courseUnit:id,faculty_id')
             ->firstOrFail();
         $eligibleProgramIds = $this->eligibleProgramIds($subject, (int) $academicYear->id);
+        $eligibleDepartmentIds = $eligibleProgramIds === []
+            ? []
+            : Department::query()
+                ->whereHas('programs', fn ($query) => $query->whereIn('programs.id', $eligibleProgramIds))
+                ->pluck('id')
+                ->all();
 
         $validated = $request->validate([
             'subject_id' => ['required', 'integer', Rule::in([$subject->id])],
+            'department_id' => ['required', 'integer', Rule::in($eligibleDepartmentIds)],
             'enrollment_id' => ['required', 'integer', Rule::exists('enrollments', 'id')->where(fn ($query) => $query
                 ->where('academic_year_id', $academicYear->id)
                 ->where('status', 'active')
@@ -104,6 +128,17 @@ class GradeController extends Controller
             'type' => ['required', Rule::in(['cc', 'exam', 'rattrapage'])],
             'score' => ['required', 'numeric', 'min:0', 'max:10'],
         ]);
+
+        $enrollmentBelongsToDepartment = Enrollment::query()
+            ->whereKey($validated['enrollment_id'])
+            ->whereHas('program', fn ($query) => $query->where('department_id', $validated['department_id']))
+            ->exists();
+
+        if (! $enrollmentBelongsToDepartment) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'enrollment_id' => 'Choisissez un étudiant inscrit dans le département sélectionné.',
+            ]);
+        }
 
         $assessmentLabel = trim($validated['assessment_label']);
         if ($assessmentLabel === '') {
@@ -151,7 +186,12 @@ class GradeController extends Controller
 
         return Curriculum::query()
             ->where('academic_year_id', $academicYearId)
-            ->whereHas('program.department', fn ($query) => $query->where('faculty_id', $subject->courseUnit->faculty_id))
+            ->whereHas('program.department', function ($query) use ($subject) {
+                $query->where('faculty_id', $subject->courseUnit->faculty_id);
+                if ($subject->department_id) {
+                    $query->whereKey($subject->department_id);
+                }
+            })
             ->whereHas('semesters.courseUnits', fn ($query) => $query->where('course_units.id', $subject->course_unit_id))
             ->distinct()
             ->pluck('program_id')

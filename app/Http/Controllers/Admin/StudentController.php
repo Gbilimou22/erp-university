@@ -10,6 +10,7 @@ use App\Models\Department;
 use App\Models\Enrollment;
 use App\Models\Faculty;
 use App\Models\Student;
+use App\Models\StudentFee;
 use App\Models\Program;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -103,6 +104,14 @@ class StudentController extends Controller
             'academic_year_id' => ['required', 'exists:academic_years,id'],
             'level' => ['required', 'regex:/^(L[1-7]|M[1-2]|D[1-3])$/'],
             'class_id' => ['nullable', 'exists:classes,id'],
+            'fees.registration.amount' => ['required', 'numeric', 'min:0.01', 'max:9999999999.99'],
+            'fees.registration.due_date' => ['required', 'date', 'after_or_equal:today'],
+            'fees.tuition.0.amount' => ['required', 'numeric', 'min:0.01', 'max:9999999999.99'],
+            'fees.tuition.0.due_date' => ['required', 'date', 'after_or_equal:today'],
+            'fees.tuition.1.amount' => ['required', 'numeric', 'min:0.01', 'max:9999999999.99'],
+            'fees.tuition.1.due_date' => ['required', 'date', 'after:fees.tuition.0.due_date'],
+            'fees.tuition.2.amount' => ['required', 'numeric', 'min:0.01', 'max:9999999999.99'],
+            'fees.tuition.2.due_date' => ['required', 'date', 'after:fees.tuition.1.due_date'],
         ]);
 
         $department = Department::with('faculty')->findOrFail($validated['department_id']);
@@ -156,15 +165,33 @@ class StudentController extends Controller
                 'status' => 'active',
             ]);
 
-            Enrollment::create([
+            $enrollment = Enrollment::create([
                 'student_id' => $student->id,
                 'faculty_id' => $department->faculty_id,
                 'program_id' => $validated['program_id'],
                 'class_id' => $classGroup?->id,
                 'academic_year_id' => $validated['academic_year_id'],
                 'level' => $validated['level'],
-                'status' => 'active',
+                'status' => 'pending',
             ]);
+
+            StudentFee::create([
+                'enrollment_id' => $enrollment->id,
+                'title' => 'Frais d’inscription',
+                'fee_type' => 'registration',
+                'amount' => $validated['fees']['registration']['amount'],
+                'due_date' => $validated['fees']['registration']['due_date'],
+            ]);
+            foreach ($validated['fees']['tuition'] as $index => $installment) {
+                StudentFee::create([
+                    'enrollment_id' => $enrollment->id,
+                    'title' => 'Frais de scolarité — Tranche '.($index + 1),
+                    'fee_type' => 'tuition',
+                    'installment_number' => $index + 1,
+                    'amount' => $installment['amount'],
+                    'due_date' => $installment['due_date'],
+                ]);
+            }
 
             AuditEvent::create([
                 'actor_id' => request()->user()?->id,

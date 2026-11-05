@@ -4,6 +4,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { ClipboardCheck } from 'lucide-react';
 
 type Subject = { id: number; code: string; name: string; course_unit?: { code: string; name: string } };
+type Department = { id: number; code: string; name: string };
 type Student = { id: number; level: string; student: { registration_number: string; first_name: string; last_name: string } };
 type Grade = {
     id: number;
@@ -20,19 +21,24 @@ const typeLabels = { cc: 'Contrôle continu', exam: 'Examen', rattrapage: 'Rattr
 export default function GradeEntry({
     academicYear,
     subjects,
+    departments,
     selectedSubjectId,
+    selectedDepartmentId,
     students,
     grades,
 }: {
     academicYear: { id: number; name: string } | null;
     subjects: Subject[];
+    departments: Department[];
     selectedSubjectId: number | null;
+    selectedDepartmentId: number | null;
     students: Student[];
     grades: Grade[];
 }) {
     const { flash } = usePage().props as unknown as { flash: { success?: string } };
     const form = useForm({
         subject_id: String(selectedSubjectId ?? ''),
+        department_id: String(selectedDepartmentId ?? ''),
         enrollment_id: '',
         type: 'cc',
         assessment_label: '',
@@ -41,11 +47,20 @@ export default function GradeEntry({
 
     React.useEffect(() => {
         form.setData('subject_id', String(selectedSubjectId ?? ''));
-    }, [selectedSubjectId]);
+        form.setData('department_id', String(selectedDepartmentId ?? ''));
+    }, [selectedSubjectId, selectedDepartmentId]);
 
     const selectSubject = (event: React.ChangeEvent<HTMLSelectElement>) => {
         const subjectId = event.target.value;
         router.get(route('teacher.grades.index'), subjectId ? { subject_id: subjectId } : {}, { preserveState: true, replace: true });
+    };
+
+    const selectDepartment = (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const departmentId = event.target.value;
+        router.get(route('teacher.grades.index'), {
+            subject_id: selectedSubjectId,
+            ...(departmentId ? { department_id: departmentId } : {}),
+        }, { preserveState: true, replace: true });
     };
 
     const submit = (event: React.FormEvent) => {
@@ -69,7 +84,7 @@ export default function GradeEntry({
                 <div className="mx-auto max-w-6xl space-y-6">
                     <section className="overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-indigo-950 to-indigo-800 p-6 text-white shadow-sm sm:p-8"><div className="flex flex-wrap items-center justify-between gap-5"><div><p className="text-sm text-indigo-200">Suivi des résultats</p><h2 className="mt-2 text-3xl font-bold">Saisie des notes</h2><p className="mt-2 text-sm text-indigo-100">Enregistrez et consultez les résultats des étudiants de vos matières.</p></div><div className="rounded-2xl bg-white/10 p-4"><ClipboardCheck className="h-8 w-8" /></div></div></section>
                     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-4 sm:grid-cols-3">
                             <div>
                                 <h2 className="font-semibold text-slate-900">Année universitaire</h2>
                                 <p className="mt-1 text-sm text-slate-600">{academicYear?.name ?? 'Aucune année courante définie.'}</p>
@@ -78,6 +93,11 @@ export default function GradeEntry({
                                 <select value={selectedSubjectId ?? ''} onChange={selectSubject} className="mt-1 w-full rounded-lg border-slate-300">
                                     <option value="">Choisir une matière</option>
                                     {subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.code} — {subject.name}</option>)}
+                                </select>
+                            </label>
+                            <label className="text-sm font-medium text-slate-700">Département
+                                <select value={selectedDepartmentId ?? ''} onChange={selectDepartment} disabled={!selectedSubjectId || departments.length === 0} className="mt-1 w-full rounded-lg border-slate-300 disabled:bg-slate-100">
+                                    {departments.length === 0 ? <option value="">Aucun département admissible</option> : departments.map((department) => <option key={department.id} value={department.id}>{department.code} — {department.name}</option>)}
                                 </select>
                             </label>
                         </div>
@@ -89,6 +109,8 @@ export default function GradeEntry({
                         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">Définissez une année universitaire courante avant de saisir des notes.</section>
                     ) : subjects.length === 0 ? (
                         <section className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">Aucune matière ne vous est affectée pour cette année.</section>
+                    ) : selectedSubjectId && departments.length === 0 ? (
+                        <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">Aucun département n’est lié à cette matière dans la maquette de l’année courante. Vérifiez la maquette pédagogique et l’affectation de la matière.</section>
                     ) : selectedSubjectId && <>
                         <form onSubmit={submit} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-5">
                             <label className="text-sm font-medium text-slate-700">Étudiant
@@ -96,6 +118,7 @@ export default function GradeEntry({
                                     <option value="">Choisir</option>
                                     {students.map(({ id, student }) => <option key={id} value={id}>{student.registration_number} — {student.first_name} {student.last_name}</option>)}
                                 </select>
+                                {students.length === 0 && <span className="mt-1 block text-xs font-normal text-amber-700">Aucun étudiant actif trouvé pour ce département et cette année. Vérifiez les inscriptions et la filière liée à la matière.</span>}
                                 {form.errors.enrollment_id && <span className="mt-1 block text-xs text-red-600">{form.errors.enrollment_id}</span>}
                             </label>
                             <label className="text-sm font-medium text-slate-700">Type

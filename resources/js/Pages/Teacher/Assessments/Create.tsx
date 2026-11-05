@@ -1,0 +1,56 @@
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import BackButton from '@/Components/BackButton';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { FormEventHandler } from 'react';
+import { ClipboardList } from 'lucide-react';
+
+
+type OptionInput = { text: string; is_correct: boolean };
+type QuestionInput = { text: string; type: 'qcm' | 'direct'; points: string; options: OptionInput[] };
+type AssessmentType = 'qcm' | 'direct' | 'mixed' | 'other';
+type Department = { id: number; code: string; name: string };
+type Subject = { id: number; code: string; name: string; departments: Department[] };
+const typeLabels: Record<string, string> = { qcm: 'QCM', direct: 'Questions directes', mixed: 'Mixte', other: 'Autre' };
+
+export default function Create({ subjects, academicYear }: { subjects: Subject[]; academicYear: { id: number; name: string } | null }) {
+    const { flash } = usePage().props as unknown as { flash: { success?: string } };
+    const form = useForm<{ subject_id: string; department_id: string; title: string; instructions: string; type: AssessmentType; starts_at: string; ends_at: string; duration_minutes: string; anti_cheat_enabled: boolean; questions: QuestionInput[] }>({ subject_id: '', department_id: '', title: '', instructions: '', type: 'qcm', starts_at: '', ends_at: '', duration_minutes: '', anti_cheat_enabled: false, questions: [{ text: '', type: 'qcm', points: '1', options: [{ text: '', is_correct: true }, { text: '', is_correct: false }] }] });
+    const submit: FormEventHandler = (event) => { event.preventDefault(); form.post(route('teacher.assessments.store'), { preserveScroll: true, onSuccess: () => form.reset() }); };
+    const updateQuestion = (index: number, field: keyof QuestionInput, value: unknown) => form.setData('questions', form.data.questions.map((question, i) => i === index ? { ...question, [field]: value } : question));
+    const updateOption = (questionIndex: number, optionIndex: number, field: keyof OptionInput, value: unknown) => form.setData('questions', form.data.questions.map((question, i) => i === questionIndex ? { ...question, options: question.options.map((option, j) => j === optionIndex ? { ...option, [field]: value } : option) } : question));
+
+    return <AuthenticatedLayout header={<div><p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Espace enseignant</p><h1 className="mt-1 text-2xl font-semibold text-slate-900">Évaluations</h1></div>}>
+        <Head title="Évaluations" />
+        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-7 sm:px-6 lg:px-8"><div className="mx-auto max-w-6xl space-y-7">
+            <BackButton href={route('teacher.assessments.index')} label="Retour aux rubriques" />
+            <section className="overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-800 to-violet-700 p-6 text-white shadow-sm sm:p-8"><div className="flex flex-wrap items-center justify-between gap-5"><div><p className="text-sm text-indigo-100">Création et suivi des épreuves</p><h2 className="mt-2 text-3xl font-bold">Vos évaluations</h2><p className="mt-2 text-sm text-indigo-100">Préparez une évaluation, choisissez ses règles et suivez les copies et résultats.</p></div><div className="rounded-2xl bg-white/10 p-4"><ClipboardList className="h-8 w-8" /></div></div></section>
+            {flash.success && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{flash.success}</p>}
+            <p className="text-xs text-slate-500">Les horaires suivent le fuseau configuré pour l’application.</p>
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="text-lg font-semibold text-slate-900">Créer une évaluation {academicYear ? `· ${academicYear.name}` : ''}</h2>
+                {!academicYear ? <p className="mt-3 text-sm text-amber-800">Aucune année universitaire courante.</p> : subjects.length === 0 ? <p className="mt-3 text-sm text-slate-600">Aucune matière affectée pour l’année courante.</p> : <form onSubmit={submit} className="mt-4 space-y-5">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <label className="text-sm font-medium">Matière<select required value={form.data.subject_id} onChange={e => form.setData(data => ({ ...data, subject_id: e.target.value, department_id: '' }))} className="mt-1 w-full rounded-lg border-slate-300"><option value="">Choisir</option>{subjects.map(s => <option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}</select>{form.errors.subject_id && <span className="mt-1 block text-xs text-red-600">{form.errors.subject_id}</span>}</label>
+                        <label className="text-sm font-medium">Département destinataire<select required value={form.data.department_id} onChange={e => form.setData('department_id', e.target.value)} disabled={!form.data.subject_id} className="mt-1 w-full rounded-lg border-slate-300 disabled:bg-slate-100"><option value="">Choisir un département</option>{(subjects.find(s => String(s.id) === form.data.subject_id)?.departments ?? []).map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}</select>{form.errors.department_id && <span className="mt-1 block text-xs text-red-600">{form.errors.department_id}</span>}</label>
+                        <label className="text-sm font-medium">Titre<input required maxLength={150} value={form.data.title} onChange={e => form.setData('title', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" placeholder="Ex. Examen de mi-semestre" /></label>
+                        <label className="text-sm font-medium">Type d’évaluation<select value={form.data.type} onChange={e => { const type = e.target.value as AssessmentType; form.setData(data => ({ ...data, type, questions: type === 'direct' ? data.questions.map(question => ({ ...question, type: 'direct' as const })) : type === 'qcm' ? data.questions.map(question => ({ ...question, type: 'qcm' as const })) : data.questions })); }} className="mt-1 w-full rounded-lg border-slate-300">{Object.entries(typeLabels).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></label>
+                        <label className="text-sm font-medium">Durée en minutes<input type="number" min="1" max="600" value={form.data.duration_minutes} onChange={e => form.setData('duration_minutes', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" placeholder="Optionnelle" /></label>
+                        <label className="text-sm font-medium">Début<input required type="datetime-local" value={form.data.starts_at} onChange={e => form.setData('starts_at', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" /></label>
+                        <label className="text-sm font-medium">Fin<input required type="datetime-local" value={form.data.ends_at} onChange={e => form.setData('ends_at', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" /></label>
+                    </div>
+                    <label className="block text-sm font-medium">Consignes<textarea rows={2} maxLength={5000} value={form.data.instructions} onChange={e => form.setData('instructions', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" /></label>
+                    <label className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm"><input type="checkbox" checked={form.data.anti_cheat_enabled} onChange={e => form.setData('anti_cheat_enabled', e.target.checked)} className="mt-0.5 rounded border-amber-400" /><span><strong className="block text-amber-950">Activer l’anti-triche</strong><span className="mt-1 block text-amber-900">La copie sera remise automatiquement si l’étudiant quitte la page, change d’onglet ou perd le focus pendant l’évaluation.</span></span></label>
+                    <div className="space-y-4">
+                        {form.data.questions.map((question, qi) => <fieldset key={qi} className="rounded-lg border border-slate-200 p-4"><legend className="px-2 text-sm font-semibold">Question {qi + 1}</legend>
+                            <div className="grid gap-3 md:grid-cols-[1fr_180px_120px]"><input required value={question.text} onChange={e => updateQuestion(qi, 'text', e.target.value)} placeholder="Énoncé" className="rounded-lg border-slate-300" /><select value={question.type} disabled={form.data.type === 'direct' || form.data.type === 'qcm'} onChange={e => updateQuestion(qi, 'type', e.target.value)} className="rounded-lg border-slate-300 disabled:bg-slate-100"><option value="qcm">QCM</option><option value="direct">Réponse écrite</option></select><label className="text-sm">Points<input required type="number" min="0.01" max="100" step="0.01" value={question.points} onChange={e => updateQuestion(qi, 'points', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" /></label></div>
+                            {question.type === 'qcm' && <div className="mt-3 space-y-2">{question.options.map((option, oi) => <div key={oi} className="flex gap-2"><input required value={option.text} onChange={e => updateOption(qi, oi, 'text', e.target.value)} placeholder={`Choix ${oi + 1}`} className="w-full rounded-lg border-slate-300" /><label className="flex shrink-0 items-center gap-2 text-xs"><input type="radio" checked={option.is_correct} onChange={() => form.setData('questions', form.data.questions.map((q, i) => i === qi ? { ...q, options: q.options.map((o, j) => ({ ...o, is_correct: j === oi })) } : q))} name={`correct-${qi}`} /> Bonne réponse</label><button type="button" onClick={() => updateQuestion(qi, 'options', question.options.filter((_, j) => j !== oi))} className="text-sm text-red-700">Retirer</button></div>)}<button type="button" onClick={() => updateQuestion(qi, 'options', [...question.options, { text: '', is_correct: false }])} className="text-sm font-medium text-indigo-700">+ Ajouter un choix</button></div>}
+                        </fieldset>)}
+                        <button type="button" onClick={() => form.setData('questions', [...form.data.questions, { text: '', type: 'qcm', points: '1', options: [{ text: '', is_correct: true }, { text: '', is_correct: false }] }])} className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-800">+ Ajouter une question</button>
+                    </div>
+                    {Object.entries(form.errors).map(([key, value]) => <p key={key} className="text-sm text-red-700">{value}</p>)}
+                    <div><button disabled={form.processing} className="rounded-lg bg-indigo-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{form.processing ? 'Enregistrement…' : 'Créer le brouillon'}</button><p className="mt-2 text-xs text-slate-500">L’évaluation reste invisible aux étudiants jusqu’à son lancement dans le créneau prévu.</p></div>
+                </form>}
+            </section>
+                    </div></main>
+    </AuthenticatedLayout>;
+}

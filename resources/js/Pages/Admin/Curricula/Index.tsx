@@ -2,7 +2,7 @@ import React from 'react';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackButton from '@/Components/BackButton';
-import { BookOpen, Layers3, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, ChevronDown, Layers3, Plus, Trash2 } from 'lucide-react';
 
 type AcademicYear = { id: number; name: string; is_current: boolean };
 type Program = { id: string; code: string; name: string; degree_level: string; duration_years: number; department: { id: number; name: string; faculty_id: number } };
@@ -12,6 +12,7 @@ type Curriculum = { id: string; name: string; version: number; academic_year_id:
 type PageProps = { flash?: { success?: string }; errors?: Record<string, string> };
 
 function CurriculumCard({ curriculum, courseUnits }: { curriculum: Curriculum; courseUnits: CourseUnit[] }) {
+    const [expanded, setExpanded] = React.useState(false);
     const hasLmdCreditTarget = ['LICENCE', 'MASTER'].includes(curriculum.program.degree_level);
     const semesterForm = useForm<{ code: string; name: string; position: number; target_credits: number | '' }>({ code: '', name: '', position: curriculum.semesters.length + 1, target_credits: hasLmdCreditTarget ? 30 : '' });
     const unitForm = useForm({ course_unit_id: '', is_required: true });
@@ -27,9 +28,9 @@ function CurriculumCard({ curriculum, courseUnits }: { curriculum: Curriculum; c
     return <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 p-5">
             <div className="flex items-start gap-3"><span className="rounded-xl bg-indigo-100 p-2.5 text-indigo-700"><BookOpen className="h-5 w-5" /></span><div><h2 className="font-semibold text-slate-900">{curriculum.name}</h2><p className="mt-1 text-sm text-slate-600">{curriculum.program.code} · {curriculum.program.name}</p><p className="text-xs text-slate-500">{curriculum.program.department.name} · Année d’application {curriculum.academic_year.name}</p></div></div>
-            <div className="flex items-center gap-2"><span className="rounded-full border border-indigo-100 bg-white px-3 py-1 text-xs font-semibold text-indigo-700">Version {curriculum.version}</span><button type="button" disabled={curriculum.semesters.length > 0} title={curriculum.semesters.length > 0 ? 'Supprimez les périodes avant de supprimer la maquette' : 'Supprimer la maquette'} onClick={() => { if (confirm(`Supprimer la maquette ${curriculum.name} ?`)) router.delete(route('admin.curricula.destroy', curriculum.id)); }} className="rounded-lg p-2 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-4 w-4" /></button></div>
+            <div className="flex items-center gap-2"><span className="rounded-full border border-indigo-100 bg-white px-3 py-1 text-xs font-semibold text-indigo-700">{curriculum.semesters.length} période{curriculum.semesters.length !== 1 ? 's' : ''}</span><button type="button" onClick={() => setExpanded(value => !value)} aria-expanded={expanded} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">{expanded ? 'Replier' : 'Déplier'}<ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} /></button><span className="rounded-full border border-indigo-100 bg-white px-3 py-1 text-xs font-semibold text-indigo-700">Version {curriculum.version}</span><button type="button" disabled={curriculum.semesters.length > 0} title={curriculum.semesters.length > 0 ? 'Supprimez les périodes avant de supprimer la maquette' : 'Supprimer la maquette'} onClick={() => { if (confirm(`Supprimer la maquette ${curriculum.name} ?`)) router.delete(route('admin.curricula.destroy', curriculum.id)); }} className="rounded-lg p-2 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-4 w-4" /></button></div>
         </header>
-        <div className="space-y-4 p-5">
+        {expanded && <div className="space-y-4 p-5">
             {curriculum.semesters.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">Aucun semestre défini. Ajoutez les périodes selon l’organisation de cette filière.</p> : curriculum.semesters.map((semester) => {
                 const totalCredits = semester.course_units.reduce((sum, unit) => sum + unit.credits, 0);
                 return <section key={semester.id} className="overflow-hidden rounded-xl border border-slate-200">
@@ -50,7 +51,7 @@ function CurriculumCard({ curriculum, courseUnits }: { curriculum: Curriculum; c
                 <label className="text-sm font-medium text-slate-700">Crédits repères<input type="number" min={1} max={60} value={semesterForm.data.target_credits} onChange={(event) => semesterForm.setData('target_credits', event.target.value ? Number(event.target.value) : '')} placeholder="Facultatif" className="mt-1 w-full rounded-lg border-slate-300 bg-white" />{semesterForm.errors.target_credits && <span className="mt-1 block text-xs text-red-600">{semesterForm.errors.target_credits}</span>}</label>
                 <button disabled={semesterForm.processing} className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"><Plus className="h-4 w-4" />Ajouter la période</button>
             </form>
-        </div>
+        </div>}
     </article>;
 }
 

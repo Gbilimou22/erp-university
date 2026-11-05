@@ -42,6 +42,15 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'teacherNotifications' => fn () => $request->user()?->role === 'teacher'
+                ? $request->user()->unreadNotifications()->latest()->limit(8)->get()->map(fn ($notification) => [
+                    'id' => $notification->id,
+                    'title' => $notification->data['title'] ?? 'Notification',
+                    'message' => $notification->data['message'] ?? '',
+                    'url' => $notification->data['url'] ?? route('teacher.grades.index'),
+                    'created_at' => $notification->created_at?->toIso8601String(),
+                ])->values()
+                : [],
         ]);
     }
 }

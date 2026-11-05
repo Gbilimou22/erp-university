@@ -11,5 +11,5 @@ class AssessmentQuestion extends Model
     protected $fillable = ['assessment_id', 'question_text', 'type', 'points', 'position'];
     protected function casts(): array { return ['points' => 'decimal:2']; }
     public function assessment(): BelongsTo { return $this->belongsTo(Assessment::class); }
-    public function options(): HasMany { return $this->hasMany(AssessmentOption::class)->orderBy('position'); }
+    public function options(): HasMany { return $this->hasMany(AssessmentOption::class, 'question_id')->orderBy('position'); }
 }

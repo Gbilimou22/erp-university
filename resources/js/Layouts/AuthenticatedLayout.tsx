@@ -3,9 +3,9 @@ import BackButton from '@/Components/BackButton';
 import { Link, usePage } from '@inertiajs/react';
 import { PropsWithChildren, ReactNode, useEffect, useState } from 'react';
 import {
-    BookMarked, BookOpen, Building2, CalendarDays, ChevronDown, ClipboardList,
-    DoorOpen, GraduationCap, LayoutDashboard, LogOut, School, ShieldCheck,
-    Users, UsersRound,
+    BookMarked, BookOpen, Building2, CalendarDays, ChevronDown, ClipboardCheck, ClipboardList,
+    DoorOpen, FileBarChart2, GraduationCap, LayoutDashboard, LogOut, Plus, School, ShieldCheck,
+    Users, UsersRound, CreditCard,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -27,6 +27,7 @@ export default function Authenticated({ header, children }: PropsWithChildren<{ 
             { label: 'Programmes et maquettes', href: route('admin.curricula.index'), active: route().current('admin.curricula.*'), icon: BookMarked },
             { label: 'Groupes pédagogiques', href: route('admin.academic-groups.index'), active: route().current('admin.academic-groups.*'), icon: School },
             { label: 'Étudiants', href: route('admin.students.index'), active: route().current('admin.students.*'), icon: Users },
+            { label: 'Service scolarité', href: route('admin.finance.index'), active: route().current('admin.finance.*'), icon: CreditCard },
             { label: 'Enseignants', href: route('admin.teachers.index'), active: route().current('admin.teachers.*'), icon: GraduationCap },
             { label: 'Unités d’enseignement', href: route('admin.teaching.index'), active: route().current('admin.teaching.index'), icon: BookMarked },
             { label: 'Matières', href: route('admin.teaching.subjects.index'), active: route().current('admin.teaching.subjects.index'), icon: BookOpen },
@@ -42,14 +43,14 @@ export default function Authenticated({ header, children }: PropsWithChildren<{ 
             { label: 'Mon emploi du temps', href: route('student.timetable'), active: route().current('student.timetable'), icon: CalendarDays },
             { label: 'Mon groupe', href: route('student.group'), active: route().current('student.group'), icon: UsersRound },
             { label: 'Mes résultats', href: route('student.grades.index'), active: route().current('student.grades.*'), icon: ClipboardList },
-            { label: 'Évaluations en cours', href: route('student.assessments.index'), active: route().current('student.assessments.*'), icon: ClipboardList },
+            { label: 'Mes évaluations', href: route('student.assessments.index'), active: route().current('student.assessments.*'), icon: ClipboardList },
+            { label: 'Frais et paiements', href: route('student.finance.index'), active: route().current('student.finance.*'), icon: CreditCard },
         ] : []),
         ...(isTeacher ? [
             { label: 'Tableau de bord', href: route('teacher.dashboard'), active: route().current('teacher.dashboard'), icon: LayoutDashboard },
             { label: 'Mes matières', href: route('teacher.subjects.index'), active: route().current('teacher.subjects.*'), icon: BookOpen },
             { label: 'Mon emploi du temps', href: route('teacher.timetable'), active: route().current('teacher.timetable'), icon: CalendarDays },
             { label: 'Saisie des notes', href: route('teacher.grades.index'), active: route().current('teacher.grades.*'), icon: ClipboardList },
-            { label: 'Évaluations', href: route('teacher.assessments.index'), active: route().current('teacher.assessments.*'), icon: ClipboardList },
             { label: 'Mes groupes', href: route('teacher.groups.index'), active: route().current('teacher.groups.*'), icon: UsersRound },
         ] : []),
         ...(isParent ? [
@@ -62,21 +63,24 @@ export default function Authenticated({ header, children }: PropsWithChildren<{ 
     const adminGroups = [
         { title: 'Vue générale', labels: ['Tableau de bord'] },
         { title: 'Structure et cursus', labels: ['Structure académique', 'Années universitaires', 'Programmes et maquettes', 'Groupes pédagogiques'] },
-        { title: 'Étudiants et équipe', labels: ['Étudiants', 'Enseignants'] },
+        { title: 'Étudiants et équipe', labels: ['Étudiants', 'Service scolarité', 'Enseignants'] },
         { title: 'Enseignements', labels: ['Unités d’enseignement', 'Matières', 'Affectations enseignants'] },
         { title: 'Planning', labels: ['Emploi du temps', 'Salles', 'Séances planifiées'] },
         { title: 'Notes et sécurité', labels: ['Publication des notes', 'Récupération des comptes'] },
     ].map(group => ({ ...group, items: navItems.filter(item => group.labels.includes(item.label)) }));
     const activeGroup = adminGroups.find(group => group.items.some(item => item.active))?.title ?? 'Vue générale';
     const [expandedGroup, setExpandedGroup] = useState(activeGroup);
+    const [teacherAssessmentsOpen, setTeacherAssessmentsOpen] = useState(route().current('teacher.assessments.*'));
     useEffect(() => setExpandedGroup(activeGroup), [activeGroup]);
+    useEffect(() => { if (route().current('teacher.assessments.*')) setTeacherAssessmentsOpen(true); }, [route().current('teacher.assessments.*')]);
 
     const hasContextualBack = [
         'admin.academic.index', 'admin.academic-groups.index', 'admin.academic-groups.show', 'admin.curricula.index',
         'admin.students.create', 'admin.students.show', 'admin.students.edit', 'admin.teachers.index', 'admin.teachers.create',
         'admin.teaching.index', 'admin.teaching.subjects.index', 'admin.teaching.assignments', 'admin.timetable.index',
         'admin.timetable.rooms.index', 'admin.timetable.entries.index', 'student.group', 'student.timetable',
-        'parent.tracking', 'parent.documents', 'teacher.assessments.results',
+        'parent.tracking', 'parent.documents', 'teacher.assessments.create', 'teacher.assessments.to-launch', 'teacher.assessments.active',
+        'teacher.assessments.completed', 'teacher.assessments.result-sheets', 'teacher.assessments.students', 'teacher.assessments.results',
     ].some(name => route().current(name));
 
     const renderNavItem = (item: NavItem) => {
@@ -97,7 +101,15 @@ export default function Authenticated({ header, children }: PropsWithChildren<{ 
                     const open = expandedGroup === group.title;
                     if (group.title === 'Vue générale') return <div key={group.title}>{group.items.map(renderNavItem)}</div>;
                     return <section key={group.title}><button type="button" aria-expanded={open} onClick={() => setExpandedGroup(open ? '' : group.title)} className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"><span>{group.title}</span><ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} /></button>{open && <div className="ml-2 space-y-1 border-l border-white/10 py-1 pl-2">{group.items.map(renderNavItem)}</div>}</section>;
-                })}</div> : <div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1 lg:overflow-visible">{navItems.map(renderNavItem)}</div>}
+                })}</div> : isTeacher ? <div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1 lg:overflow-visible">{navItems.map(renderNavItem)}<section className="min-w-[220px]"><button type="button" aria-expanded={teacherAssessmentsOpen} onClick={() => setTeacherAssessmentsOpen(!teacherAssessmentsOpen)} className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition ${route().current('teacher.assessments.*') ? 'bg-white/10 text-white ring-1 ring-white/10' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}><span className="flex items-center gap-3"><ClipboardList className="h-4 w-4" />Évaluations</span><ChevronDown className={`h-4 w-4 transition-transform ${teacherAssessmentsOpen ? 'rotate-180' : ''}`} /></button>{teacherAssessmentsOpen && <div className="ml-3 mt-1 space-y-1 border-l border-white/10 py-1 pl-2">{[
+                    { label: 'Vue d’ensemble', href: route('teacher.assessments.index'), active: route().current('teacher.assessments.index'), icon: LayoutDashboard },
+                    { label: 'Créer une évaluation', href: route('teacher.assessments.create'), active: route().current('teacher.assessments.create'), icon: Plus },
+                    { label: 'Évaluations à lancer', href: route('teacher.assessments.to-launch'), active: route().current('teacher.assessments.to-launch'), icon: ClipboardList },
+                    { label: 'Évaluations en cours', href: route('teacher.assessments.active'), active: route().current('teacher.assessments.active'), icon: ClipboardList },
+                    { label: 'Évaluations terminées', href: route('teacher.assessments.completed'), active: route().current('teacher.assessments.completed'), icon: ClipboardCheck },
+                    { label: 'Fiches de résultats', href: route('teacher.assessments.result-sheets'), active: route().current('teacher.assessments.result-sheets') || route().current('teacher.assessments.results'), icon: FileBarChart2 },
+                    { label: 'Étudiants et notes', href: route('teacher.assessments.students'), active: route().current('teacher.assessments.students'), icon: UsersRound },
+                ].map(renderNavItem)}</div>}</section></div> : <div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1 lg:overflow-visible">{navItems.map(renderNavItem)}</div>}
             </nav>
             <div className="border-t border-white/10 p-4 lg:mt-4"><div className="rounded-xl bg-white/10 p-3"><p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Connecté</p><p className="mt-1 truncate text-sm font-semibold text-white">{user.name}</p><p className="truncate text-xs text-slate-400">{user.email}</p></div><div className="mt-3 grid grid-cols-2 gap-2"><Link href={route('profile.edit')} className="flex items-center justify-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"><ShieldCheck className="h-4 w-4" />Profil</Link><Link href={route('logout')} method="post" as="button" className="flex items-center justify-center gap-2 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-500"><LogOut className="h-4 w-4" />Sortir</Link></div></div>
         </aside>

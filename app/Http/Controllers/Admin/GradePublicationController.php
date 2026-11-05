@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AuditEvent;
 use App\Models\Grade;
+use App\Models\SubjectTeacherAssignment;
+use App\Models\User;
+use App\Notifications\GradesPublishedNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -68,7 +71,8 @@ class GradePublicationController extends Controller
                 )
                 ->lockForUpdate();
 
-            $gradeIds = $grades->pluck('id');
+            $gradeRows = $grades->get(['id', 'entered_by']);
+            $gradeIds = $gradeRows->pluck('id');
             $count = $gradeIds->count();
             if ($count === 0) {
                 return 0;
@@ -79,6 +83,26 @@ class GradePublicationController extends Controller
                 'published_by' => $request->user()->id,
                 'published_at' => now(),
             ]);
+
+            $teacherIds = $gradeRows->pluck('entered_by')->filter()->merge(
+                SubjectTeacherAssignment::query()
+                    ->where('subject_id', $data['subject_id'])
+                    ->where('academic_year_id', $data['academic_year_id'])
+                    ->pluck('teacher_id')
+            )->unique();
+            $teachers = User::query()->whereIn('id', $teacherIds)->where('role', 'teacher')->get();
+            $subject = \App\Models\Subject::query()->find($data['subject_id']);
+            $yearName = \App\Models\AcademicYear::query()->whereKey($data['academic_year_id'])->value('name');
+            foreach ($teachers as $teacher) {
+                $teacher->notify(new GradesPublishedNotification(
+                    subjectId: (int) $data['subject_id'],
+                    subjectName: $subject?->name ?? 'Matière',
+                    academicYear: $yearName ?? '',
+                    assessmentType: $data['type'],
+                    assessmentLabel: $data['assessment_label'],
+                    gradeCount: $count,
+                ));
+            }
 
             AuditEvent::create([
                 'actor_id' => $request->user()->id,

@@ -12,5 +12,5 @@ class AssessmentAttempt extends Model
     protected function casts(): array { return ['started_at' => 'datetime', 'submitted_at' => 'datetime', 'score' => 'decimal:2']; }
     public function assessment(): BelongsTo { return $this->belongsTo(Assessment::class); }
     public function enrollment(): BelongsTo { return $this->belongsTo(Enrollment::class); }
-    public function answers(): HasMany { return $this->hasMany(AssessmentAnswer::class); }
+    public function answers(): HasMany { return $this->hasMany(AssessmentAnswer::class, 'attempt_id'); }
 }

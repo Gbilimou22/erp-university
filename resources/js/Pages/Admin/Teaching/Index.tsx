@@ -5,11 +5,12 @@ import BackButton from '@/Components/BackButton';
 import { BookOpen, Layers3, Plus, Trash2, Pencil, Users } from 'lucide-react';
 
 type Faculty = { id: number; name: string; code: string };
+type Department = { id: number; faculty_id: number; name: string; code: string };
 type CourseUnit = { id: number; faculty_id: number; code: string; name: string; credits: number; faculty: Faculty; subjects_count: number };
 
-export default function TeachingIndex({ faculties, courseUnits }: { faculties: Faculty[]; courseUnits: CourseUnit[] }) {
+export default function TeachingIndex({ faculties, departments, courseUnits }: { faculties: Faculty[]; departments: Department[]; courseUnits: CourseUnit[] }) {
     const ue = useForm({ faculty_id: '', code: '', name: '', credits: 3 });
-    const ecue = useForm({ course_unit_id: '', code: '', name: '', coefficient: 1 });
+    const ecue = useForm({ course_unit_id: '', department_id: '', code: '', name: '', coefficient: 1 });
     const [editingUe, setEditingUe] = React.useState<number | null>(null);
     const [editingEcue, setEditingEcue] = React.useState<number | null>(null);
 
@@ -62,8 +63,12 @@ export default function TeachingIndex({ faculties, courseUnits }: { faculties: F
 
                     <form id="ecue-form" onSubmit={createEcue} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h2 className="flex items-center gap-2 font-semibold text-slate-800">{editingEcue ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}{editingEcue ? 'Modifier une matière (ECUE)' : 'Créer une matière (ECUE)'}</h2>
+                        <select required value={ecue.data.department_id} onChange={(e) => { const dept = departments.find(d => String(d.id) === e.target.value); ecue.setData(data => ({ ...data, department_id: e.target.value, course_unit_id: courseUnits.some(u => String(u.id) === data.course_unit_id && u.faculty_id === dept?.faculty_id) ? data.course_unit_id : '' })); }} className="w-full rounded-lg border-slate-300">
+                            <option value="">Choisir le département</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name} ({department.code})</option>)}
+                        </select>
+                        {ecue.errors.department_id && <p className="text-sm text-red-600">{ecue.errors.department_id}</p>}
                         <select required value={ecue.data.course_unit_id} onChange={(e) => ecue.setData('course_unit_id', e.target.value)} className="w-full rounded-lg border-slate-300">
-                            <option value="">Rattacher à une UE</option>{courseUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}
+                            <option value="">Rattacher à une UE de la faculté</option>{courseUnits.filter(unit => unit.faculty_id === departments.find(d => String(d.id) === ecue.data.department_id)?.faculty_id).map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}
                         </select>
                         {ecue.errors.course_unit_id && <p className="text-sm text-red-600">{ecue.errors.course_unit_id}</p>}
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -86,7 +91,7 @@ export default function TeachingIndex({ faculties, courseUnits }: { faculties: F
                         <article key={unit.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                             <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 p-4">
                                 <div className="flex items-center gap-3"><Layers3 className="h-5 w-5 text-indigo-600" /><div><h2 className="font-semibold text-slate-800">{unit.name}</h2><p className="text-xs text-slate-500">{unit.code} · {unit.credits} crédits · {unit.faculty?.name}</p></div></div>
-                                <div className="flex flex-wrap gap-1"><button type="button" onClick={() => { resetEcue(); ecue.setData('course_unit_id', String(unit.id)); document.getElementById('ecue-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"><Plus className="h-4 w-4" />Ajouter une matière</button><button type="button" onClick={() => editUe(unit)} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"><Pencil className="h-4 w-4" />Modifier</button><button type="button" onClick={() => { if (confirm(`Supprimer l’UE ${unit.code} ?`)) router.delete(route('admin.teaching.course-units.destroy', unit.id)); }} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" />Supprimer</button></div>
+                                <div className="flex flex-wrap gap-1"><button type="button" onClick={() => { resetEcue(); ecue.setData(data => ({ ...data, course_unit_id: String(unit.id) })); document.getElementById('ecue-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"><Plus className="h-4 w-4" />Ajouter une matière</button><button type="button" onClick={() => editUe(unit)} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"><Pencil className="h-4 w-4" />Modifier</button><button type="button" onClick={() => { if (confirm(`Supprimer l’UE ${unit.code} ?`)) router.delete(route('admin.teaching.course-units.destroy', unit.id)); }} className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" />Supprimer</button></div>
                             </div>
                             <div className="flex flex-wrap items-center justify-between gap-3 p-4"><p className="text-sm text-slate-500">{unit.subjects_count} matière{unit.subjects_count !== 1 ? 's' : ''} rattachée{unit.subjects_count !== 1 ? 's' : ''}</p><Link href={route('admin.teaching.subjects.index')} className="text-sm font-medium text-indigo-700 hover:text-indigo-900">Consulter les matières →</Link></div>
                         </article>

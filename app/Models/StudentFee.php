@@ -14,6 +14,8 @@ class StudentFee extends Model
     protected $fillable = [
         'enrollment_id',
         'title',
+        'fee_type',
+        'installment_number',
         'amount',
         'due_date',
     ];
@@ -21,6 +23,7 @@ class StudentFee extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'due_date' => 'date',
+        'installment_number' => 'integer',
     ];
 
     public function enrollment(): BelongsTo

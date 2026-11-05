@@ -49,6 +49,7 @@ export default function CreateStudent({ departments = [], academicYears = [], cu
         academic_year_id: String(currentYear?.id ?? academicYears[0]?.id ?? ''),
         level: 'L1',
         class_id: '',
+        fees: { registration: { amount: '', due_date: '' }, tuition: [{ amount: '', due_date: '' }, { amount: '', due_date: '' }, { amount: '', due_date: '' }] },
     });
 
     const submit = (event: React.FormEvent) => {
@@ -265,6 +266,15 @@ export default function CreateStudent({ departments = [], academicYears = [], cu
                         </div>
 
                         {/* Erreur globale éventuelle */}
+                        <section className="space-y-4 border-t border-slate-100 pt-5">
+                            <div><h2 className="text-lg font-bold text-slate-900">Frais de scolarité à créer</h2><p className="mt-1 text-sm text-slate-500">Renseignez les frais avant de valider l’inscription. La scolarité est répartie en trois tranches avec des échéances successives.</p></div>
+                            <div className="grid gap-4 rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 sm:grid-cols-2">
+                                <label className="text-sm font-medium text-slate-700">Frais d’inscription<input required type="number" min="0.01" step="0.01" value={data.fees.registration.amount} onChange={e => setData('fees', { ...data.fees, registration: { ...data.fees.registration, amount: e.target.value } })} className="mt-1 w-full rounded-lg border-slate-300" /></label>
+                                <label className="text-sm font-medium text-slate-700">Échéance des frais d’inscription<input required type="date" min={new Date().toISOString().slice(0, 10)} value={data.fees.registration.due_date} onChange={e => setData('fees', { ...data.fees, registration: { ...data.fees.registration, due_date: e.target.value } })} className="mt-1 w-full rounded-lg border-slate-300" /></label>
+                            </div>
+                            <div className="grid gap-4 lg:grid-cols-3">{data.fees.tuition.map((installment, index) => <div key={index} className="space-y-3 rounded-xl border border-slate-200 p-4"><h3 className="font-semibold text-slate-800">Scolarité — Tranche {index + 1}</h3><label className="block text-sm font-medium text-slate-700">Montant<input required type="number" min="0.01" step="0.01" value={installment.amount} onChange={e => { const tuition = [...data.fees.tuition]; tuition[index] = { ...tuition[index], amount: e.target.value }; setData('fees', { ...data.fees, tuition }); }} className="mt-1 w-full rounded-lg border-slate-300" /></label><label className="block text-sm font-medium text-slate-700">Date limite<input required type="date" min={index > 0 ? data.fees.tuition[index - 1].due_date || new Date().toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)} value={installment.due_date} onChange={e => { const tuition = [...data.fees.tuition]; tuition[index] = { ...tuition[index], due_date: e.target.value }; setData('fees', { ...data.fees, tuition }); }} className="mt-1 w-full rounded-lg border-slate-300" /></label></div>)}</div>
+                        </section>
+
                         {(errors as Record<string, string>).error && (
                             <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
                                 {(errors as Record<string, string>).error}

@@ -10,6 +10,7 @@ use App\Models\AssessmentQuestion;
 use App\Models\AssessmentAttempt;
 use App\Models\AuditEvent;
 use App\Models\Subject;
+use App\Models\Program;
 use App\Services\SubjectEligibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,22 +23,120 @@ class AssessmentController extends Controller
 {
     public function index(Request $request): Response
     {
-        $year = AcademicYear::where('is_current', true)->first();
-        $assessments = Assessment::query()
-            ->with('subject:id,code,name')
-            ->withCount('attempts')
-            ->where('teacher_id', $request->user()->id)
-            ->when($year, fn ($query) => $query->where('academic_year_id', $year->id))
-            ->latest('starts_at')
-            ->paginate(20);
+        $teacherId = $request->user()->id;
+        $base = Assessment::query()->where('teacher_id', $teacherId);
 
         return Inertia::render('Teacher/Assessments/Index', [
-            'assessments' => $assessments,
+            'counts' => [
+                'scheduled' => (clone $base)->where('status', 'draft')->where('ends_at', '>', now())->count(),
+                'active' => (clone $base)->where('status', 'launched')->where('starts_at', '<=', now())->where('ends_at', '>', now())->count(),
+                'completed' => (clone $base)->where(function ($query) {
+                    $query->where('status', 'closed')->orWhere('ends_at', '<=', now());
+                })->where('status', '!=', 'draft')->count(),
+                'results' => (clone $base)->whereHas('attempts', fn ($query) => $query->where('status', 'corrected'))->count(),
+                'students' => AssessmentAttempt::query()->whereIn('status', ['submitted', 'corrected'])
+                    ->whereHas('assessment', fn ($query) => $query->where('teacher_id', $teacherId))->count(),
+            ],
+        ]);
+    }
+
+    public function create(Request $request, SubjectEligibility $eligibility): Response
+    {
+        $year = AcademicYear::where('is_current', true)->first();
+
+        return Inertia::render('Teacher/Assessments/Create', [
             'subjects' => $year ? $request->user()->taughtSubjects()
                 ->wherePivot('academic_year_id', $year->id)
-                ->orderBy('name')->get(['subjects.id', 'subjects.code', 'subjects.name']) : [],
+                ->with('courseUnit:id,faculty_id')
+                ->orderBy('name')->get(['subjects.id', 'subjects.course_unit_id', 'subjects.department_id', 'subjects.code', 'subjects.name'])
+                ->map(fn (Subject $subject) => [
+                    'id' => $subject->id, 'code' => $subject->code, 'name' => $subject->name,
+                    'departments' => Program::query()->whereIn('id', $eligibility->programIds($subject, (int) $year->id))
+                        ->with('department:id,name,code')->get()->pluck('department')->filter()->unique('id')->values(),
+                ]) : [],
             'academicYear' => $year?->only(['id', 'name']),
         ]);
+    }
+
+    public function active(Request $request): Response
+    {
+        return $this->assessmentList($request, 'Évaluations en cours', 'Épreuves lancées dont le créneau est actuellement ouvert.', fn ($query) => $query
+            ->where('status', 'launched')->where('starts_at', '<=', now())->where('ends_at', '>', now()));
+    }
+
+    public function toLaunch(Request $request): Response
+    {
+        return $this->assessmentList($request, 'Évaluations à lancer', 'Brouillons planifiés. Le lancement est possible uniquement pendant le créneau prévu.', fn ($query) => $query
+            ->where('status', 'draft')->where('ends_at', '>', now()));
+    }
+
+    public function completed(Request $request): Response
+    {
+        return $this->assessmentList($request, 'Évaluations terminées', 'Épreuves dont le créneau est terminé ou qui ont été clôturées.', fn ($query) => $query
+            ->where('status', '!=', 'draft')->where(function ($query) {
+                $query->where('status', 'closed')->orWhere('ends_at', '<=', now());
+            }));
+    }
+
+    public function resultSheets(Request $request): Response
+    {
+        return $this->assessmentList($request, 'Fiches de résultats', 'Ouvrez le classement, les notes et les copies corrigées de chaque épreuve.', fn ($query) => $query
+            ->whereHas('attempts', fn ($attempts) => $attempts->where('status', 'corrected')));
+    }
+
+    public function studentResults(Request $request): Response
+    {
+        $attempts = AssessmentAttempt::query()
+            ->with([
+                'assessment.subject:id,code,name',
+                'enrollment.student:id,registration_number,first_name,last_name',
+            ])
+            ->whereIn('status', ['submitted', 'corrected'])
+            ->whereHas('assessment', fn ($query) => $query->where('teacher_id', $request->user()->id))
+            ->whereHas('enrollment.student')
+            ->orderByDesc('submitted_at')
+            ->get();
+
+        $rankByAttempt = [];
+        foreach ($attempts->where('status', 'corrected')->groupBy('assessment_id') as $group) {
+            $sorted = $group->sortByDesc(fn ($attempt) => (float) $attempt->score)->values();
+            $rank = 0;
+            $previousScore = null;
+            foreach ($sorted as $index => $attempt) {
+                $score = (float) $attempt->score;
+                if ($previousScore === null || $score < $previousScore) $rank = $index + 1;
+                $rankByAttempt[$attempt->id] = $rank;
+                $previousScore = $score;
+            }
+        }
+
+        return Inertia::render('Teacher/Assessments/StudentResults', [
+            'results' => $attempts->map(fn ($attempt) => [
+                'id' => $attempt->id,
+                'status' => $attempt->status,
+                'score' => $attempt->score,
+                'rank' => $rankByAttempt[$attempt->id] ?? null,
+                'submitted_at' => $attempt->submitted_at?->toIso8601String(),
+                'assessment_id' => $attempt->assessment->id,
+                'assessment_title' => $attempt->assessment->title,
+                'subject' => $attempt->assessment->subject->only(['code', 'name']),
+                'student' => $attempt->enrollment->student->only(['registration_number', 'first_name', 'last_name']),
+            ])->values(),
+        ]);
+    }
+
+    private function assessmentList(Request $request, string $title, string $description, \Closure $filter): Response
+    {
+        $assessments = Assessment::query()
+            ->with(['subject:id,code,name', 'department:id,name,code', 'academicYear:id,name'])
+            ->withCount(['attempts', 'attempts as corrected_attempts_count' => fn ($query) => $query->where('status', 'corrected')])
+            ->where('teacher_id', $request->user()->id)
+            ->where($filter)
+            ->orderByDesc('starts_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        return Inertia::render('Teacher/Assessments/List', compact('title', 'description', 'assessments'));
     }
 
     public function store(Request $request, SubjectEligibility $eligibility): RedirectResponse
@@ -45,6 +144,7 @@ class AssessmentController extends Controller
         $year = AcademicYear::where('is_current', true)->firstOrFail();
         $data = $request->validate([
             'subject_id' => ['required', 'integer'],
+            'department_id' => ['required', 'integer', 'exists:departments,id'],
             'title' => ['required', 'string', 'max:150'],
             'instructions' => ['nullable', 'string', 'max:5000'],
             'type' => ['required', 'in:qcm,direct,mixed,other'],
@@ -56,10 +156,14 @@ class AssessmentController extends Controller
             'questions.*.text' => ['required', 'string', 'max:5000'],
             'questions.*.type' => ['required', 'in:qcm,direct'],
             'questions.*.points' => ['required', 'numeric', 'min:0.01', 'max:100'],
-            'questions.*.options' => ['nullable', 'array', 'max:10'],
-            'questions.*.options.*.text' => ['required', 'string', 'max:1000'],
-            'questions.*.options.*.is_correct' => ['required', 'boolean'],
         ]);
+
+        if ($data['type'] === 'direct' && collect($data['questions'])->contains(fn ($question) => $question['type'] !== 'direct')) {
+            throw ValidationException::withMessages(['questions' => 'Une évaluation de questions directes doit contenir uniquement des questions écrites.']);
+        }
+        if ($data['type'] === 'qcm' && collect($data['questions'])->contains(fn ($question) => $question['type'] !== 'qcm')) {
+            throw ValidationException::withMessages(['questions' => 'Une évaluation QCM doit contenir uniquement des questions à choix.']);
+        }
 
         $subject = $request->user()->taughtSubjects()
             ->where('subjects.id', $data['subject_id'])
@@ -67,14 +171,26 @@ class AssessmentController extends Controller
             ->with('courseUnit:id,faculty_id')
             ->firstOrFail();
 
-        if ($eligibility->programIds($subject, (int) $year->id) === []) {
+        $eligibleProgramIds = $eligibility->programIds($subject, (int) $year->id);
+        $eligibleDepartmentIds = Program::query()->whereIn('id', $eligibleProgramIds)->pluck('department_id')->unique()->all();
+        if (! in_array((int) $data['department_id'], array_map('intval', $eligibleDepartmentIds), true)) {
+            throw ValidationException::withMessages(['department_id' => 'Ce département ne propose pas cette matière dans une maquette de l’année courante.']);
+        }
+        if ($eligibleProgramIds === []) {
             throw ValidationException::withMessages(['subject_id' => 'Aucun programme étudiant n’est rattaché à cette matière pour l’année courante.']);
         }
 
         foreach ($data['questions'] as $index => $question) {
             $options = $question['options'] ?? [];
-            if ($question['type'] === 'qcm' && (count($options) < 2 || count(array_filter($options, fn ($option) => $option['is_correct'])) !== 1)) {
-                throw ValidationException::withMessages(["questions.{$index}.options" => 'Chaque QCM doit proposer au moins deux choix et une seule bonne réponse.']);
+            if ($question['type'] === 'qcm') {
+                $options = validator(['options' => $options], [
+                    'options' => ['required', 'array', 'min:2', 'max:10'],
+                    'options.*.text' => ['required', 'string', 'max:1000'],
+                    'options.*.is_correct' => ['required', 'boolean'],
+                ])->validate()['options'];
+                if (count(array_filter($options, fn ($option) => $option['is_correct'])) !== 1) {
+                    throw ValidationException::withMessages(["questions.{$index}.options" => 'Chaque QCM doit proposer au moins deux choix et une seule bonne réponse.']);
+                }
             }
         }
 
@@ -82,6 +198,7 @@ class AssessmentController extends Controller
             $assessment = Assessment::create([
                 'teacher_id' => $request->user()->id,
                 'subject_id' => $data['subject_id'],
+                'department_id' => $data['department_id'],
                 'academic_year_id' => $year->id,
                 'title' => $data['title'],
                 'instructions' => $data['instructions'] ?? null,
@@ -181,6 +298,15 @@ class AssessmentController extends Controller
             ];
         }
 
+        $summary = [
+            'total' => $assessment->attempts()->count(),
+            'submitted' => $assessment->attempts()->where('status', 'submitted')->count(),
+            'corrected' => $assessment->attempts()->where('status', 'corrected')->count(),
+            'in_progress' => $assessment->attempts()->where('status', 'in_progress')->count(),
+            'average' => round((float) ($assessment->attempts()->where('status', 'corrected')->avg('score') ?? 0), 2),
+            'highest' => $assessment->attempts()->where('status', 'corrected')->max('score'),
+        ];
+
         return Inertia::render('Teacher/Assessments/Results', [
             'assessment' => [
                 'id' => $assessment->id,
@@ -197,6 +323,7 @@ class AssessmentController extends Controller
             ],
             'attempts' => $attempts,
             'ranking' => $ranking,
+            'summary' => $summary,
         ]);
     }
 

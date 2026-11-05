@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AssessmentAnswer extends Model
 {
     protected $fillable = ['attempt_id', 'question_id', 'option_id', 'answer_text'];
+    public function attempt(): BelongsTo { return $this->belongsTo(AssessmentAttempt::class, 'attempt_id'); }
     public function question(): BelongsTo { return $this->belongsTo(AssessmentQuestion::class); }
     public function option(): BelongsTo { return $this->belongsTo(AssessmentOption::class); }
 }

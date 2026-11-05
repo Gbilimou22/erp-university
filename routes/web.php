@@ -13,7 +13,9 @@ use App\Http\Controllers\Admin\CurriculumController;
 use App\Http\Controllers\Admin\ClassGroupController;
 use App\Http\Controllers\Admin\AccountRecoveryController;
 use App\Http\Controllers\Admin\GradePublicationController;
+use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\Teacher\AssessmentController as TeacherAssessmentController;
+use App\Http\Controllers\Teacher\NotificationController as TeacherNotificationController;
 use App\Http\Controllers\Teacher\TeachingProgressController;
 use App\Http\Controllers\Teacher\WorkspaceController as TeacherWorkspaceController;
 use App\Http\Controllers\Student\AssessmentController as StudentAssessmentController;
@@ -21,6 +23,7 @@ use App\Http\Controllers\Auth\FirstLoginPasswordController;
 use App\Http\Controllers\Student\TimetableController as StudentTimetableController;
 use App\Http\Controllers\Student\GroupController as StudentGroupController;
 use App\Http\Controllers\Student\GradeController as StudentGradeController;
+use App\Http\Controllers\Student\FinanceController as StudentFinanceController;
 use App\Http\Controllers\GradeController;
 use App\Http\Controllers\Teacher\TimetableController as TeacherTimetableController;
 use App\Http\Middleware\RequirePasswordChange;
@@ -62,6 +65,8 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         Route::post('/account-recovery/{user}/reset', [AccountRecoveryController::class, 'reset'])->name('account-recovery.reset');
         Route::get('/grades/publication', [GradePublicationController::class, 'index'])->name('grades.index');
         Route::post('/grades/publication', [GradePublicationController::class, 'publish'])->name('grades.publish');
+        Route::get('/finance', [AdminFinanceController::class, 'index'])->name('finance.index');
+        Route::post('/finance/fees/{fee}/payments', [AdminFinanceController::class, 'recordPayment'])->name('finance.payments.store');
 
         // Enseignants
         Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
@@ -155,17 +160,34 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
     // --- ESPACE ÉTUDIANT (/student/...) ---
     Route::prefix('student')->name('student.')->middleware('role:student')->group(function () {
         Route::get('/dashboard', function () {
-            $student = auth()->user()->student()
-                ->with(['department.faculty', 'enrollments.academicYear', 'enrollments.program', 'enrollments.classGroup'])
-                ->first();
+            $currentYear = \App\Models\AcademicYear::query()->where('is_current', true)->first();
+            $student = auth()->user()->student()->with('department.faculty')->first();
+            $enrollments = $student?->enrollments()->where('status', 'active');
+            $enrollment = $enrollments
+                ? (clone $enrollments)->when($currentYear, fn ($query) => $query->where('academic_year_id', $currentYear->id))
+                    ->with(['academicYear:id,name', 'program:id,name', 'classGroup:id,code,name'])->latest('id')->first()
+                : null;
+            $enrollment ??= $enrollments?->with(['academicYear:id,name', 'program:id,name', 'classGroup:id,code,name'])->latest('id')->first();
+            $pendingFinancialEnrollment = $student?->enrollments()->where('status', 'pending')->exists() ?? false;
+            $publishedGradesCount = $student
+                ? \App\Models\Grade::query()->where('status', 'published')
+                    ->whereHas('enrollment', fn ($query) => $query->where('student_id', $student->id))->count()
+                : 0;
 
-            return Inertia::render('Student/Dashboard', ['student' => $student]);
+            return Inertia::render('Student/Dashboard', [
+                'student' => $student,
+                'enrollment' => $enrollment,
+                'currentAcademicYear' => $currentYear?->name,
+                'publishedGradesCount' => $publishedGradesCount,
+                'pendingFinancialEnrollment' => $pendingFinancialEnrollment,
+            ]);
         })->name('dashboard');
 
         // Emploi du Temps Étudiant
         Route::get('/timetable', [StudentTimetableController::class, 'index'])->name('timetable');
         Route::get('/group', [StudentGroupController::class, 'show'])->name('group');
         Route::get('/grades', [StudentGradeController::class, 'index'])->name('grades.index');
+        Route::get('/finance', [StudentFinanceController::class, 'index'])->name('finance.index');
         Route::get('/assessments', [StudentAssessmentController::class, 'index'])->name('assessments.index');
         Route::get('/assessments/{assessment}', [StudentAssessmentController::class, 'show'])->name('assessments.show');
         Route::post('/assessments/{assessment}/start', [StudentAssessmentController::class, 'start'])->name('assessments.start');
@@ -175,8 +197,15 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
 
     // --- ESPACE ENSEIGNANT (/teacher/...) ---
     Route::prefix('teacher')->name('teacher.')->middleware('role:teacher')->group(function () {
+        Route::patch('/notifications/{notification}/read', [TeacherNotificationController::class, 'markRead'])->name('notifications.read');
         Route::post('/progress/sessions', [TeachingProgressController::class, 'storeSession'])->name('progress.sessions.store');
         Route::get('/assessments', [TeacherAssessmentController::class, 'index'])->name('assessments.index');
+        Route::get('/assessments/create', [TeacherAssessmentController::class, 'create'])->name('assessments.create');
+        Route::get('/assessments/to-launch', [TeacherAssessmentController::class, 'toLaunch'])->name('assessments.to-launch');
+        Route::get('/assessments/active', [TeacherAssessmentController::class, 'active'])->name('assessments.active');
+        Route::get('/assessments/completed', [TeacherAssessmentController::class, 'completed'])->name('assessments.completed');
+        Route::get('/assessments/results', [TeacherAssessmentController::class, 'resultSheets'])->name('assessments.result-sheets');
+        Route::get('/assessments/students', [TeacherAssessmentController::class, 'studentResults'])->name('assessments.students');
         Route::post('/assessments', [TeacherAssessmentController::class, 'store'])->name('assessments.store');
         Route::post('/assessments/{assessment}/launch', [TeacherAssessmentController::class, 'launch'])->name('assessments.launch');
         Route::get('/assessments/{assessment}/results', [TeacherAssessmentController::class, 'results'])->name('assessments.results');

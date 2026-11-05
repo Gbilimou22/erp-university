@@ -14,6 +14,7 @@ class Subject extends Model
 
     protected $fillable = [
         'course_unit_id',
+        'department_id',
         'code',
         'name',
         'coefficient',
@@ -28,6 +29,11 @@ class Subject extends Model
     public function courseUnit(): BelongsTo
     {
         return $this->belongsTo(CourseUnit::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     /**
