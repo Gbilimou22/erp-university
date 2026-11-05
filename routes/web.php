@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\ClassGroupController;
 use App\Http\Controllers\Admin\AccountRecoveryController;
 use App\Http\Controllers\Admin\GradePublicationController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
+use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Teacher\AssessmentController as TeacherAssessmentController;
 use App\Http\Controllers\Teacher\NotificationController as TeacherNotificationController;
 use App\Http\Controllers\Teacher\TeachingProgressController;
@@ -67,6 +68,9 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         Route::post('/grades/publication', [GradePublicationController::class, 'publish'])->name('grades.publish');
         Route::get('/finance', [AdminFinanceController::class, 'index'])->name('finance.index');
         Route::post('/finance/fees/{fee}/payments', [AdminFinanceController::class, 'recordPayment'])->name('finance.payments.store');
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::post('/settings/platform', [SettingsController::class, 'updatePlatform'])->name('settings.platform.update');
+        Route::put('/settings/departments/{department}/fee-schedule', [SettingsController::class, 'saveDepartmentFeeSchedule'])->name('settings.departments.fee-schedule.update');
 
         // Enseignants
         Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');

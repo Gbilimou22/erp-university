@@ -30,7 +30,8 @@ class ClassGroupController extends Controller
                 ->orderByDesc('academic_year_id')
                 ->orderBy('level_code')
                 ->orderBy('code')
-                ->get(),
+                ->paginate(20)
+                ->withQueryString(),
         ]);
     }
 

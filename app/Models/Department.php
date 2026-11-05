@@ -36,4 +36,9 @@ class Department extends Model
     {
         return $this->hasMany(Student::class);
     }
+
+    public function feeSchedules(): HasMany
+    {
+        return $this->hasMany(DepartmentFeeSchedule::class);
+    }
 }

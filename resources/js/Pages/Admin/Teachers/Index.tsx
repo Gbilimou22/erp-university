@@ -2,12 +2,14 @@ import React from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackButton from '@/Components/BackButton';
+import Pagination from '@/Components/Pagination';
 import { BookOpen, CalendarDays, Copy, KeyRound, UserPlus, Users } from 'lucide-react';
 
 type Teacher = { id: number; name: string; email: string; is_active: boolean; created_at: string; taught_subjects_count: number };
+type Paginator<T> = { data: T[]; links: Array<{ url: string | null; label: string; active: boolean }>; from: number | null; to: number | null; total: number };
 type FlashProps = { flash?: { success?: string; temporaryCredentials?: { email: string; password: string } } };
 
-export default function TeachersIndex({ teachers }: { teachers: Teacher[] }) {
+export default function TeachersIndex({ teachers }: { teachers: Paginator<Teacher> }) {
     const { flash } = usePage().props as FlashProps;
     const [copied, setCopied] = React.useState(false);
     const copyCredentials = async () => {
@@ -48,8 +50,9 @@ export default function TeachersIndex({ teachers }: { teachers: Teacher[] }) {
                 </section>}
 
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-100 p-4"><h2 className="font-semibold text-slate-800">Enseignants enregistrés <span className="ml-1 text-sm font-normal text-slate-500">({teachers.length})</span></h2></div>
-                    {teachers.length === 0 ? <div className="p-8 text-center"><p className="text-sm text-slate-500">Aucun compte enseignant enregistré.</p><Link href={route('admin.teachers.create')} className="mt-3 inline-flex items-center gap-2 font-semibold text-indigo-700"><UserPlus className="h-4 w-4"/>Créer le premier compte</Link></div> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-4">Enseignant</th><th className="p-4">Statut du compte</th><th className="p-4">Matières affectées</th></tr></thead><tbody className="divide-y">{teachers.map((teacher) => <tr key={teacher.id}><td className="p-4"><p className="font-medium text-slate-800">{teacher.name}</p><p className="text-xs text-slate-500">{teacher.email}</p></td><td className="p-4"><span className={`rounded-full px-2 py-1 text-xs ${teacher.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{teacher.is_active ? 'Actif' : 'Désactivé'}</span></td><td className="p-4">{teacher.taught_subjects_count}</td></tr>)}</tbody></table></div>}
+                    <div className="border-b border-slate-100 p-4"><h2 className="font-semibold text-slate-800">Enseignants enregistrés <span className="ml-1 text-sm font-normal text-slate-500">({teachers.total})</span></h2></div>
+                    {teachers.data.length === 0 ? <div className="p-8 text-center"><p className="text-sm text-slate-500">Aucun compte enseignant enregistré.</p><Link href={route('admin.teachers.create')} className="mt-3 inline-flex items-center gap-2 font-semibold text-indigo-700"><UserPlus className="h-4 w-4"/>Créer le premier compte</Link></div> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-4">Enseignant</th><th className="p-4">Statut du compte</th><th className="p-4">Matières affectées</th></tr></thead><tbody className="divide-y">{teachers.data.map((teacher) => <tr key={teacher.id}><td className="p-4"><p className="font-medium text-slate-800">{teacher.name}</p><p className="text-xs text-slate-500">{teacher.email}</p></td><td className="p-4"><span className={`rounded-full px-2 py-1 text-xs ${teacher.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{teacher.is_active ? 'Actif' : 'Désactivé'}</span></td><td className="p-4">{teacher.taught_subjects_count}</td></tr>)}</tbody></table></div>}
+                    <Pagination {...teachers} itemLabel="comptes enseignants" />
                 </section>
                 </div>
             </main>

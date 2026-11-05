@@ -1,6 +1,6 @@
 import React from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Save } from 'lucide-react';
+import { Settings, Save } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackButton from '@/Components/BackButton';
 
@@ -10,6 +10,19 @@ interface Department {
     code: string;
     faculty?: { name: string };
     programs: Array<{ id: string | number; name: string; code: string }>;
+    fee_schedules: FeeSchedule[];
+}
+
+interface FeeSchedule {
+    academic_year_id: number;
+    registration_amount: string;
+    registration_due_date: string;
+    tuition_installment_1_amount: string;
+    tuition_installment_1_due_date: string;
+    tuition_installment_2_amount: string;
+    tuition_installment_2_due_date: string;
+    tuition_installment_3_amount: string;
+    tuition_installment_3_due_date: string;
 }
 
 interface AcademicYear {
@@ -49,7 +62,6 @@ export default function CreateStudent({ departments = [], academicYears = [], cu
         academic_year_id: String(currentYear?.id ?? academicYears[0]?.id ?? ''),
         level: 'L1',
         class_id: '',
-        fees: { registration: { amount: '', due_date: '' }, tuition: [{ amount: '', due_date: '' }, { amount: '', due_date: '' }, { amount: '', due_date: '' }] },
     });
 
     const submit = (event: React.FormEvent) => {
@@ -66,6 +78,10 @@ export default function CreateStudent({ departments = [], academicYears = [], cu
         && group.level_code === data.level
         && group.enrollments_count < group.capacity
     );
+    const feeSchedule = departments.find((department) => String(department.id) === data.department_id)
+        ?.fee_schedules.find((schedule) => String(schedule.academic_year_id) === data.academic_year_id);
+    const formatAmount = (amount: string) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(amount));
+    const formatDate = (date: string) => new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(`${date}T00:00:00`));
 
     return (
         <AuthenticatedLayout
@@ -267,12 +283,26 @@ export default function CreateStudent({ departments = [], academicYears = [], cu
 
                         {/* Erreur globale éventuelle */}
                         <section className="space-y-4 border-t border-slate-100 pt-5">
-                            <div><h2 className="text-lg font-bold text-slate-900">Frais de scolarité à créer</h2><p className="mt-1 text-sm text-slate-500">Renseignez les frais avant de valider l’inscription. La scolarité est répartie en trois tranches avec des échéances successives.</p></div>
-                            <div className="grid gap-4 rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 sm:grid-cols-2">
-                                <label className="text-sm font-medium text-slate-700">Frais d’inscription<input required type="number" min="0.01" step="0.01" value={data.fees.registration.amount} onChange={e => setData('fees', { ...data.fees, registration: { ...data.fees.registration, amount: e.target.value } })} className="mt-1 w-full rounded-lg border-slate-300" /></label>
-                                <label className="text-sm font-medium text-slate-700">Échéance des frais d’inscription<input required type="date" min={new Date().toISOString().slice(0, 10)} value={data.fees.registration.due_date} onChange={e => setData('fees', { ...data.fees, registration: { ...data.fees.registration, due_date: e.target.value } })} className="mt-1 w-full rounded-lg border-slate-300" /></label>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div><h2 className="text-lg font-bold text-slate-900">Barème de scolarité</h2><p className="mt-1 text-sm text-slate-500">Les frais et les trois échéances sont préremplis depuis les paramètres du département.</p></div>
+                                <Link href={route('admin.settings.index')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"><Settings className="h-4 w-4" />Paramètres</Link>
                             </div>
-                            <div className="grid gap-4 lg:grid-cols-3">{data.fees.tuition.map((installment, index) => <div key={index} className="space-y-3 rounded-xl border border-slate-200 p-4"><h3 className="font-semibold text-slate-800">Scolarité — Tranche {index + 1}</h3><label className="block text-sm font-medium text-slate-700">Montant<input required type="number" min="0.01" step="0.01" value={installment.amount} onChange={e => { const tuition = [...data.fees.tuition]; tuition[index] = { ...tuition[index], amount: e.target.value }; setData('fees', { ...data.fees, tuition }); }} className="mt-1 w-full rounded-lg border-slate-300" /></label><label className="block text-sm font-medium text-slate-700">Date limite<input required type="date" min={index > 0 ? data.fees.tuition[index - 1].due_date || new Date().toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)} value={installment.due_date} onChange={e => { const tuition = [...data.fees.tuition]; tuition[index] = { ...tuition[index], due_date: e.target.value }; setData('fees', { ...data.fees, tuition }); }} className="mt-1 w-full rounded-lg border-slate-300" /></label></div>)}</div>
+                            {feeSchedule ? (
+                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4"><p className="text-xs font-semibold uppercase text-emerald-800">Frais d’inscription</p><p className="mt-2 text-lg font-bold text-slate-900">{formatAmount(feeSchedule.registration_amount)}</p><p className="mt-1 text-xs text-slate-600">À régler avant le {formatDate(feeSchedule.registration_due_date)}</p></div>
+                                    {[1, 2, 3].map((number) => {
+                                        const schedule = feeSchedule[`tuition_installment_${number}_amount` as keyof FeeSchedule] as string;
+                                        const dueDate = feeSchedule[`tuition_installment_${number}_due_date` as keyof FeeSchedule] as string;
+                                        return <div key={number} className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-semibold uppercase text-slate-500">Scolarité · Tranche {number}/3</p><p className="mt-2 text-lg font-bold text-slate-900">{formatAmount(schedule)}</p><p className="mt-1 text-xs text-slate-500">À régler avant le {formatDate(dueDate)}</p></div>;
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                    {data.department_id && data.academic_year_id ? 'Aucun barème n’est configuré pour ce département et cette année universitaire. Configurez-le avant de valider l’inscription.' : 'Sélectionnez un département et une année universitaire pour afficher le barème applicable.'}
+                                    <p className="mt-1 text-xs">Les frais sont créés automatiquement à l’inscription; les paiements réellement reçus restent à enregistrer par le service scolarité.</p>
+                                </div>
+                            )}
+                            {errors.department_id && <p className="text-sm text-red-600">{errors.department_id}</p>}
                         </section>
 
                         {(errors as Record<string, string>).error && (
@@ -291,7 +321,7 @@ export default function CreateStudent({ departments = [], academicYears = [], cu
                             </Link>
                             <button
                                 type="submit"
-                                disabled={processing || departments.length === 0 || academicYears.length === 0}
+                                disabled={processing || departments.length === 0 || academicYears.length === 0 || !feeSchedule}
                                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition disabled:opacity-50"
                             >
                                 <Save className="h-4 w-4" />

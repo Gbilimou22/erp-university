@@ -6,6 +6,7 @@ use App\Models\AcademicYear;
 use App\Models\Campus;
 use App\Models\ClassGroup;
 use App\Models\Department;
+use App\Models\DepartmentFeeSchedule;
 use App\Models\Enrollment;
 use App\Models\Faculty;
 use App\Models\Program;
@@ -44,6 +45,18 @@ class AcademicGroupManagementTest extends TestCase
             'end_date' => '2027-07-31',
             'is_current' => true,
         ]);
+        DepartmentFeeSchedule::create([
+            'department_id' => $department->id,
+            'academic_year_id' => $year->id,
+            'registration_amount' => 100,
+            'registration_due_date' => '2026-09-10',
+            'tuition_installment_1_amount' => 300,
+            'tuition_installment_1_due_date' => '2026-10-10',
+            'tuition_installment_2_amount' => 300,
+            'tuition_installment_2_due_date' => '2027-01-10',
+            'tuition_installment_3_amount' => 300,
+            'tuition_installment_3_due_date' => '2027-04-10',
+        ]);
 
         return [$program, $year];
     }
@@ -72,7 +85,41 @@ class AcademicGroupManagementTest extends TestCase
         ]);
         $this->get(route('admin.academic-groups.index'))->assertInertia(fn (Assert $page) => $page
             ->component('Admin/AcademicGroups/Index')
-            ->has('groups', 1));
+            ->has('groups.data', 1));
+    }
+
+    public function test_group_list_is_paginated_twenty_groups_per_page(): void
+    {
+        $this->actingAs($this->administrator());
+        [$program, $year] = $this->programAndYear();
+
+        foreach (range(1, 21) as $number) {
+            ClassGroup::create([
+                'program_id' => $program->id,
+                'academic_year_id' => $year->id,
+                'level_code' => 'L1',
+                'code' => sprintf('G%02d', $number),
+                'name' => sprintf('Groupe %02d', $number),
+                'level' => 1,
+                'capacity' => 40,
+            ]);
+        }
+
+        $this->get(route('admin.academic-groups.index'))->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/AcademicGroups/Index')
+            ->has('groups.data', 20)
+            ->where('groups.total', 21)
+            ->where('groups.current_page', 1)
+            ->where('groups.links.0.label', __('pagination.previous'))
+            ->where('groups.links.3.label', __('pagination.next')));
+
+        $this->get(route('admin.academic-groups.index', ['page' => 2]))->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/AcademicGroups/Index')
+            ->has('groups.data', 1)
+            ->where('groups.total', 21)
+            ->where('groups.current_page', 2)
+            ->where('groups.links.0.label', __('pagination.previous'))
+            ->where('groups.links.3.label', __('pagination.next')));
     }
 
     public function test_group_level_must_match_its_program_degree(): void
@@ -126,6 +173,19 @@ class AcademicGroupManagementTest extends TestCase
             'class_id' => $group->id,
             'level' => 'L1',
         ]);
+        $this->assertDatabaseHas('student_fees', [
+            'enrollment_id' => Enrollment::where('class_id', $group->id)->firstOrFail()->id,
+            'fee_type' => 'registration',
+            'amount' => 100,
+            'due_date' => '2026-09-10',
+        ]);
+        $this->assertDatabaseHas('student_fees', [
+            'enrollment_id' => Enrollment::where('class_id', $group->id)->firstOrFail()->id,
+            'fee_type' => 'tuition',
+            'installment_number' => 3,
+            'amount' => 300,
+            'due_date' => '2027-04-10',
+        ]);
 
         $secondStudent = Student::create([
             'user_id' => User::factory()->create()->id,
@@ -160,5 +220,27 @@ class AcademicGroupManagementTest extends TestCase
             'level' => 'L1',
             'class_id' => $group->id,
         ])->assertInvalid(['class_id']);
+    }
+
+    public function test_student_enrollment_requires_a_department_schedule_for_the_selected_year(): void
+    {
+        $this->actingAs($this->administrator());
+        [$program, $year] = $this->programAndYear();
+        $department = Department::findOrFail($program->department_id);
+        DepartmentFeeSchedule::where('department_id', $department->id)->delete();
+
+        $this->post(route('admin.students.store'), [
+            'first_name' => 'Aminata',
+            'last_name' => 'Diallo',
+            'email' => 'aminata@example.test',
+            'birth_date' => '2005-04-10',
+            'gender' => 'F',
+            'department_id' => $department->id,
+            'program_id' => $program->id,
+            'academic_year_id' => $year->id,
+            'level' => 'L1',
+        ])->assertInvalid(['department_id']);
+
+        $this->assertDatabaseCount('students', 0);
     }
 }

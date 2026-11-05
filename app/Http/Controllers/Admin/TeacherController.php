@@ -22,7 +22,7 @@ class TeacherController extends Controller
     {
         return Inertia::render('Admin/Teachers/Index', [
             'teachers' => User::query()->where('role', 'teacher')->withCount('taughtSubjects')
-                ->orderBy('name')->get(['id', 'name', 'email', 'is_active', 'created_at']),
+                ->orderBy('name')->paginate(20)->withQueryString(),
         ]);
     }
 

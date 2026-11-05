@@ -50,7 +50,7 @@ class TimetableController extends Controller
     public function rooms(): Response
     {
         return Inertia::render('Admin/Teachers/Rooms', [
-            'rooms' => Room::query()->with('campus:id,name')->withCount('timetableEntries')->orderBy('name')->get(),
+            'rooms' => Room::query()->with('campus:id,name')->withCount('timetableEntries')->orderBy('name')->paginate(20)->withQueryString(),
         ]);
     }
 

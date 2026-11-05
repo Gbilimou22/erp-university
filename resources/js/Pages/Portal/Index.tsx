@@ -1,12 +1,12 @@
 import React from 'react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import UniversityLogo from '@/Components/UniversityLogo';
 import { 
   GraduationCap, 
   UserCheck, 
   Users, 
   ShieldCheck, 
   BookOpen, 
-  Building2, 
   Award, 
   ArrowRight,
   Sparkles
@@ -23,6 +23,9 @@ interface Props {
 }
 
 export default function PortalIndex({ stats }: Props) {
+  const platform = usePage().props.platformSettings;
+  const platformName = platform?.platform_name || 'ERP UNIVERSITAIRE';
+
   const portals = [
     {
       title: 'Espace Étudiant',
@@ -69,25 +72,23 @@ export default function PortalIndex({ stats }: Props) {
       <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans">
         {/* Navigation Supérieure */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md">
-                <Building2 className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="font-bold text-xl text-slate-900 tracking-tight">ERP UNIVERSITAIRE</h1>
-                <p className="text-xs text-slate-500 font-medium">Plateforme Multi-Campus Intégrée</p>
+          <div className="mx-auto flex min-h-20 max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-0 lg:px-8">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="shrink-0 rounded-xl bg-indigo-50 p-1.5"><UniversityLogo compact /></div>
+              <div className="min-w-0">
+                <h1 className="max-w-full truncate text-base font-bold tracking-tight text-slate-900 sm:text-xl">{platformName}</h1>
+                <p className="truncate text-xs font-medium text-slate-500">{platform?.platform_tagline || 'Plateforme Multi-Campus Intégrée'}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-4">
               <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 Année Académique : {stats.academic_year}
               </span>
               <Link
                 href="/login"
-                className="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-indigo-600 transition-colors"
+                className="inline-flex min-h-10 shrink-0 items-center rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:text-indigo-600 sm:px-4"
               >
                 Se connecter
               </Link>
@@ -97,12 +98,12 @@ export default function PortalIndex({ stats }: Props) {
 
         {/* Section Hero */}
         <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold mb-4">
+          <div className="mx-auto mb-10 max-w-3xl text-center sm:mb-16">
+            <div className="mx-auto mb-4 inline-flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-center text-xs font-semibold text-indigo-700">
               <Sparkles className="w-4 h-4 text-indigo-600" />
               Système de Gestion Universitaire Nouvelle Génération
             </div>
-            <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight sm:text-5xl">
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
               Bienvenue sur le Portail Digital
             </h2>
             <p className="mt-4 text-lg text-slate-600 leading-relaxed">
@@ -150,7 +151,7 @@ export default function PortalIndex({ stats }: Props) {
           </div>
 
           {/* Baromètre / Chiffres Clés */}
-          <div className="bg-slate-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="relative overflow-hidden rounded-3xl bg-slate-900 p-5 text-white shadow-xl sm:p-8">
             <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-indigo-600 rounded-full opacity-20 blur-3xl"></div>
             
             <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8 text-center divide-y md:divide-y-0 md:divide-x divide-slate-800">
@@ -182,10 +183,10 @@ export default function PortalIndex({ stats }: Props) {
         </main>
 
         {/* Pied de page */}
-        <footer className="bg-white border-t border-slate-200 py-6 mt-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
-            <p>© 2026 ERP Universitaire. Tous droits réservés.</p>
-            <div className="flex gap-6">
+        <footer className="mt-8 border-t border-slate-200 bg-white py-6 sm:mt-12">
+          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 text-center text-xs text-slate-500 sm:flex-row sm:px-6 sm:text-left lg:px-8">
+            <p>© {new Date().getFullYear()} {platformName}. Tous droits réservés.</p>
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 sm:justify-end">
               <a href="#" className="hover:text-indigo-600 transition-colors">Assistance Technique</a>
               <a href="#" className="hover:text-indigo-600 transition-colors">Sécurité & Sécurisation OWASP</a>
               <a href="#" className="hover:text-indigo-600 transition-colors">Mentions Légales</a>

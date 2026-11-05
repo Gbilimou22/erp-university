@@ -3,8 +3,10 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
+use App\Models\PlatformSetting;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -42,6 +44,16 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'platformSettings' => function () {
+                $settings = PlatformSetting::query()
+                    ->whereIn('key', ['platform_name', 'contact_email', 'contact_phone', 'address', 'website', 'platform_tagline', 'logo_path', 'emblem_path'])
+                    ->pluck('value', 'key')
+                    ->all();
+                $settings['logo_url'] = !empty($settings['logo_path']) ? Storage::disk('public')->url($settings['logo_path']) : null;
+                $settings['emblem_url'] = !empty($settings['emblem_path']) ? Storage::disk('public')->url($settings['emblem_path']) : null;
+
+                return $settings;
+            },
             'teacherNotifications' => fn () => $request->user()?->role === 'teacher'
                 ? $request->user()->unreadNotifications()->latest()->limit(8)->get()->map(fn ($notification) => [
                     'id' => $notification->id,

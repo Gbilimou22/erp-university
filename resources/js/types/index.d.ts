@@ -14,5 +14,15 @@ export type PageProps<
     auth: {
         user: User;
     };
+    platformSettings?: {
+        platform_name?: string | null;
+        contact_email?: string | null;
+        contact_phone?: string | null;
+        address?: string | null;
+        website?: string | null;
+        platform_tagline?: string | null;
+        logo_url?: string | null;
+        emblem_url?: string | null;
+    };
     ziggy: Config & { location: string };
 };

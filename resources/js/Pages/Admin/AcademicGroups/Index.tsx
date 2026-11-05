@@ -3,15 +3,17 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Eye, Plus, Trash2, UsersRound } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackButton from '@/Components/BackButton';
+import Pagination from '@/Components/Pagination';
 
 type Program = { id: string; code: string; name: string; degree_level: string; duration_years: number };
 type AcademicYear = { id: number; name: string; is_current: boolean };
 type Group = { id: string; program_id: string; academic_year_id: number; level_code: string; code: string; name: string; capacity: number; enrollments_count: number; program: Program; academic_year: AcademicYear };
+type GroupPaginator = { data: Group[]; links: Array<{ url: string | null; label: string; active: boolean }>; from: number | null; to: number | null; total: number };
 type PageProps = { flash?: { success?: string }; errors?: Record<string, string> };
 
 const levelPrefix: Record<string, string> = { LICENCE: 'L', MASTER: 'M', DOCTORAT: 'D', DUT: 'L' };
 
-export default function AcademicGroupsIndex({ programs, academicYears, groups }: { programs: Program[]; academicYears: AcademicYear[]; groups: Group[] }) {
+export default function AcademicGroupsIndex({ programs, academicYears, groups }: { programs: Program[]; academicYears: AcademicYear[]; groups: GroupPaginator }) {
     const { flash, errors } = usePage().props as PageProps;
     const form = useForm({ program_id: '', academic_year_id: '', level_code: '', code: '', name: '', capacity: 60 });
     const selectedProgram = programs.find((program) => program.id === form.data.program_id);
@@ -27,7 +29,7 @@ export default function AcademicGroupsIndex({ programs, academicYears, groups }:
     return <AuthenticatedLayout header={<div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Administration · Pédagogie</p><h1 className="mt-1 text-2xl font-semibold text-slate-900">Groupes pédagogiques</h1><p className="mt-1 text-sm text-slate-500">Répartissez les étudiants par filière, année académique et niveau.</p></div>}>
         <Head title="Groupes pédagogiques" />
         <main className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-6 sm:px-6 lg:px-8"><div className="mx-auto max-w-7xl space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3"><BackButton href={route('admin.curricula.index')} label="Retour aux maquettes" /><span className="text-sm text-slate-500">{groups.length} groupe{groups.length === 1 ? '' : 's'}</span></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><BackButton href={route('admin.curricula.index')} label="Retour aux maquettes" /><span className="text-sm text-slate-500">{groups.total} groupe{groups.total === 1 ? '' : 's'}</span></div>
             {flash?.success && <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{flash.success}</div>}
             {Object.values(errors ?? {}).length > 0 && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{Object.values(errors ?? {}).join(' ')}</div>}
             <form onSubmit={submit} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2 xl:grid-cols-6 xl:items-end">
@@ -41,7 +43,8 @@ export default function AcademicGroupsIndex({ programs, academicYears, groups }:
             </form>
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                 <div className="flex items-center gap-2 border-b border-slate-100 p-4"><UsersRound className="h-5 w-5 text-emerald-700" /><h2 className="font-semibold text-slate-800">Groupes enregistrés</h2></div>
-                {groups.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">Aucun groupe créé.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-4">Groupe</th><th className="p-4">Filière</th><th className="p-4">Année</th><th className="p-4">Niveau</th><th className="p-4">Effectif</th><th className="p-4">Action</th></tr></thead><tbody className="divide-y divide-slate-100">{groups.map((group) => <tr key={group.id}><td className="p-4 font-medium text-slate-800">{group.code} — {group.name}</td><td className="p-4">{group.program.code} — {group.program.name}</td><td className="p-4">{group.academic_year.name}</td><td className="p-4">{group.level_code}</td><td className="p-4">{group.enrollments_count} / {group.capacity}</td><td className="p-4 flex items-center gap-2"><Link href={route('admin.academic-groups.show', group.id)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-700 hover:bg-slate-50"><Eye className="h-4 w-4" /> Voir</Link><button type="button" disabled={group.enrollments_count > 0} title={group.enrollments_count ? 'Ce groupe contient des étudiants inscrits' : 'Supprimer le groupe'} onClick={() => { if (confirm(`Supprimer le groupe ${group.code} ?`)) router.delete(route('admin.academic-groups.destroy', group.id)); }} className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-40"><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>}
+                {groups.data.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">Aucun groupe créé.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-4">Groupe</th><th className="p-4">Filière</th><th className="p-4">Année</th><th className="p-4">Niveau</th><th className="p-4">Effectif</th><th className="p-4">Action</th></tr></thead><tbody className="divide-y divide-slate-100">{groups.data.map((group) => <tr key={group.id}><td className="p-4 font-medium text-slate-800">{group.code} — {group.name}</td><td className="p-4">{group.program.code} — {group.program.name}</td><td className="p-4">{group.academic_year.name}</td><td className="p-4">{group.level_code}</td><td className="p-4">{group.enrollments_count} / {group.capacity}</td><td className="p-4 flex items-center gap-2"><Link href={route('admin.academic-groups.show', group.id)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-700 hover:bg-slate-50"><Eye className="h-4 w-4" /> Voir</Link><button type="button" disabled={group.enrollments_count > 0} title={group.enrollments_count ? 'Ce groupe contient des étudiants inscrits' : 'Supprimer le groupe'} onClick={() => { if (confirm(`Supprimer le groupe ${group.code} ?`)) router.delete(route('admin.academic-groups.destroy', group.id)); }} className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-40"><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>}
+                <Pagination {...groups} itemLabel="groupes" />
             </section>
         </div></main>
     </AuthenticatedLayout>;

@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import UniversityLogo from '@/Components/UniversityLogo';
 import {
     ArrowLeft,
@@ -40,6 +40,8 @@ export default function Login({
         password: '',
         remember: false,
     });
+    const platform = usePage().props.platformSettings;
+    const platformName = platform?.platform_name || 'Université';
     const activePortal = portals.find((portal) => portal.id === selectedPortal)!;
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -74,7 +76,10 @@ export default function Login({
                                     <p className="text-xl font-semibold">Accès au portail</p>
                                     <p className="mt-1 text-sm text-slate-300">Connectez-vous à votre espace universitaire.</p>
                                 </div>
-                                <p className="mt-6 hidden text-xs text-slate-400 md:block">© {new Date().getFullYear()} · Portail universitaire</p>
+                                <div className="mt-6 hidden text-xs text-slate-400 md:block">
+                                    <p>© {new Date().getFullYear()} · {platformName}</p>
+                                    {platform?.website && <a href={platform.website} className="mt-1 inline-block hover:text-white">{platform.website}</a>}
+                                </div>
                             </aside>
 
                             <section className="p-6 sm:p-9">
@@ -192,7 +197,10 @@ export default function Login({
                         </div>
                     </div>
 
-                    <footer className="text-center text-xs text-slate-400 md:hidden">© {new Date().getFullYear()} · Portail universitaire</footer>
+                    <footer className="space-y-1 text-center text-xs text-slate-400 md:hidden">
+                        <p>© {new Date().getFullYear()} · {platformName}</p>
+                        {platform?.website && <a href={platform.website} className="inline-block hover:text-slate-600">{platform.website}</a>}
+                    </footer>
                 </div>
             </main>
         </>

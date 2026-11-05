@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackButton from '@/Components/BackButton';
@@ -89,6 +89,12 @@ export default function StudentTimetable({
     const [selectedDay, setSelectedDay] = useState<number>(1);
     const [selectedEntry, setSelectedEntry] = useState<TimetableEntry | null>(null);
 
+    useEffect(() => {
+        if (window.matchMedia('(max-width: 767px)').matches) {
+            setViewMode('list');
+        }
+    }, []);
+
     const changeWeek = (offset: number) => {
         let newWeek = currentWeek + offset;
         let newYear = currentYear;
@@ -122,7 +128,7 @@ export default function StudentTimetable({
             <Head title="Mon Emploi du Temps" />
             <BackButton href={route('student.dashboard')} label="Retour au tableau de bord" />
 
-            <div className="min-h-screen p-4 space-y-6 bg-slate-50 sm:p-6">
+            <div className="min-h-screen min-w-0 space-y-6 bg-slate-50 p-4 sm:p-6">
                 <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-slate-950 via-emerald-950 to-emerald-800 p-6 text-white shadow-sm"><div><p className="text-sm text-emerald-200">Organisation de la semaine</p><h2 className="mt-2 text-2xl font-bold">Mon emploi du temps</h2><p className="mt-1 text-sm text-emerald-100">Consultez vos cours, salles et enseignants.</p></div><CalendarIcon className="h-8 w-8 text-emerald-100" /></section>
                 {/* En-tête de la page */}
                 <div className="flex flex-col gap-4 p-5 bg-white border shadow-sm md:flex-row md:items-center md:justify-between rounded-2xl border-slate-200">

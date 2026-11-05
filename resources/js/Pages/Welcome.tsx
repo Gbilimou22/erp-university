@@ -29,10 +29,10 @@ interface Props {
 
 export default function Welcome({ students }: Props) {
   return (
-    <div className="min-h-screen bg-gray-100 p-8 font-sans">
+    <div className="min-h-screen bg-gray-100 p-4 font-sans sm:p-8">
       <div className="max-w-7xl mx-auto">
         {/* En-tête */}
-        <header className="mb-8 flex justify-between items-center bg-white p-6 rounded-lg shadow-sm">
+        <header className="mb-8 flex flex-col items-start justify-between gap-4 rounded-lg bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:p-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">ERP Universitaire</h1>
             <p className="text-gray-500 text-sm">Gestion des étudiants et des inscriptions</p>
@@ -44,7 +44,7 @@ export default function Welcome({ students }: Props) {
 
         {/* Tableau des Étudiants */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <div className="flex flex-col items-start justify-between gap-3 border-b border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:px-6">
             <h2 className="text-lg font-semibold text-gray-800">Liste des Étudiants Inscrit(e)s</h2>
             <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md font-medium">
               Total : {students.length}

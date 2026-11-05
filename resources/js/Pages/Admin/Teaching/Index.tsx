@@ -2,13 +2,15 @@ import React from 'react';
 import { Head, useForm, router, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackButton from '@/Components/BackButton';
+import Pagination from '@/Components/Pagination';
 import { BookOpen, Layers3, Plus, Trash2, Pencil, Users } from 'lucide-react';
 
 type Faculty = { id: number; name: string; code: string };
 type Department = { id: number; faculty_id: number; name: string; code: string };
 type CourseUnit = { id: number; faculty_id: number; code: string; name: string; credits: number; faculty: Faculty; subjects_count: number };
+type Paginator<T> = { data: T[]; links: Array<{ url: string | null; label: string; active: boolean }>; from: number | null; to: number | null; total: number };
 
-export default function TeachingIndex({ faculties, departments, courseUnits }: { faculties: Faculty[]; departments: Department[]; courseUnits: CourseUnit[] }) {
+export default function TeachingIndex({ faculties, departments, courseUnits, courseUnitOptions }: { faculties: Faculty[]; departments: Department[]; courseUnits: Paginator<CourseUnit>; courseUnitOptions: Array<Pick<CourseUnit, 'id' | 'faculty_id' | 'code' | 'name'>> }) {
     const ue = useForm({ faculty_id: '', code: '', name: '', credits: 3 });
     const ecue = useForm({ course_unit_id: '', department_id: '', code: '', name: '', coefficient: 1 });
     const [editingUe, setEditingUe] = React.useState<number | null>(null);
@@ -63,12 +65,12 @@ export default function TeachingIndex({ faculties, departments, courseUnits }: {
 
                     <form id="ecue-form" onSubmit={createEcue} className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                         <h2 className="flex items-center gap-2 font-semibold text-slate-800">{editingEcue ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}{editingEcue ? 'Modifier une matière (ECUE)' : 'Créer une matière (ECUE)'}</h2>
-                        <select required value={ecue.data.department_id} onChange={(e) => { const dept = departments.find(d => String(d.id) === e.target.value); ecue.setData(data => ({ ...data, department_id: e.target.value, course_unit_id: courseUnits.some(u => String(u.id) === data.course_unit_id && u.faculty_id === dept?.faculty_id) ? data.course_unit_id : '' })); }} className="w-full rounded-lg border-slate-300">
+                        <select required value={ecue.data.department_id} onChange={(e) => { const dept = departments.find(d => String(d.id) === e.target.value); ecue.setData(data => ({ ...data, department_id: e.target.value, course_unit_id: courseUnitOptions.some(u => String(u.id) === data.course_unit_id && u.faculty_id === dept?.faculty_id) ? data.course_unit_id : '' })); }} className="w-full rounded-lg border-slate-300">
                             <option value="">Choisir le département</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name} ({department.code})</option>)}
                         </select>
                         {ecue.errors.department_id && <p className="text-sm text-red-600">{ecue.errors.department_id}</p>}
                         <select required value={ecue.data.course_unit_id} onChange={(e) => ecue.setData('course_unit_id', e.target.value)} className="w-full rounded-lg border-slate-300">
-                            <option value="">Rattacher à une UE de la faculté</option>{courseUnits.filter(unit => unit.faculty_id === departments.find(d => String(d.id) === ecue.data.department_id)?.faculty_id).map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}
+                            <option value="">Rattacher à une UE de la faculté</option>{courseUnitOptions.filter(unit => unit.faculty_id === departments.find(d => String(d.id) === ecue.data.department_id)?.faculty_id).map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}
                         </select>
                         {ecue.errors.course_unit_id && <p className="text-sm text-red-600">{ecue.errors.course_unit_id}</p>}
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -80,14 +82,14 @@ export default function TeachingIndex({ faculties, departments, courseUnits }: {
                         {ecue.errors.code && <p className="text-sm text-red-600">{ecue.errors.code}</p>}
                         <input required maxLength={150} placeholder="Nom de la matière" value={ecue.data.name} onChange={(e) => ecue.setData('name', e.target.value)} className="w-full rounded-lg border-slate-300" />
                         {ecue.errors.name && <p className="text-sm text-red-600">{ecue.errors.name}</p>}
-                        <div className="flex gap-2"><button disabled={ecue.processing || courseUnits.length === 0} className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-800 disabled:opacity-50">{editingEcue ? 'Enregistrer les changements' : 'Créer l’ECUE'}</button>{editingEcue && <button type="button" onClick={resetEcue} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700">Annuler</button>}</div>
+                        <div className="flex gap-2"><button disabled={ecue.processing || courseUnitOptions.length === 0} className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-800 disabled:opacity-50">{editingEcue ? 'Enregistrer les changements' : 'Créer l’ECUE'}</button>{editingEcue && <button type="button" onClick={resetEcue} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700">Annuler</button>}</div>
                     </form>
                 </div>
 
                 {Object.values(ue.errors).concat(Object.values(ecue.errors)).filter(Boolean).length > 0 && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{Object.values(ue.errors).concat(Object.values(ecue.errors)).filter(Boolean).join(' ')}</div>}
 
                 <section className="space-y-4">
-                    {courseUnits.length === 0 ? <div className="rounded-xl border bg-white p-10 text-center text-slate-500">Aucune UE. Créez d’abord une unité d’enseignement.</div> : courseUnits.map((unit) => (
+                    {courseUnits.data.length === 0 ? <div className="rounded-xl border bg-white p-10 text-center text-slate-500">Aucune UE. Créez d’abord une unité d’enseignement.</div> : courseUnits.data.map((unit) => (
                         <article key={unit.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                             <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-slate-50 p-4">
                                 <div className="flex items-center gap-3"><Layers3 className="h-5 w-5 text-indigo-600" /><div><h2 className="font-semibold text-slate-800">{unit.name}</h2><p className="text-xs text-slate-500">{unit.code} · {unit.credits} crédits · {unit.faculty?.name}</p></div></div>
@@ -97,6 +99,7 @@ export default function TeachingIndex({ faculties, departments, courseUnits }: {
                         </article>
                     ))}
                 </section>
+                <Pagination {...courseUnits} itemLabel="unités d’enseignement" />
               </div>
             </main>
         </AuthenticatedLayout>

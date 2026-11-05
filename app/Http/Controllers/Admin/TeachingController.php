@@ -24,7 +24,8 @@ class TeachingController extends Controller
             'faculties' => Faculty::query()->orderBy('name')->get(['id', 'name', 'code']),
             'departments' => Department::query()->orderBy('name')->get(['id', 'faculty_id', 'name', 'code']),
             'courseUnits' => CourseUnit::query()->with('faculty:id,name,code')->withCount('subjects')
-                ->withCount('subjects')->orderBy('name')->get(),
+                ->orderBy('name')->paginate(20)->withQueryString(),
+            'courseUnitOptions' => CourseUnit::query()->orderBy('name')->get(['id', 'faculty_id', 'code', 'name']),
         ]);
     }
 
@@ -32,8 +33,12 @@ class TeachingController extends Controller
     {
         return Inertia::render('Admin/Teaching/Subjects', [
             'departments' => Department::query()->orderBy('name')->get(['id', 'faculty_id', 'name', 'code']),
-            'courseUnits' => CourseUnit::query()->with(['faculty:id,name', 'subjects:id,course_unit_id,department_id,code,name,coefficient', 'subjects.department:id,name,code'])
-                ->orderBy('name')->get(['id', 'faculty_id', 'code', 'name', 'credits']),
+            'courseUnits' => CourseUnit::query()->orderBy('name')->get(['id', 'faculty_id', 'code', 'name', 'credits']),
+            'subjects' => Subject::query()->with([
+                'courseUnit:id,faculty_id,code,name,credits',
+                'courseUnit.faculty:id,name,code',
+                'department:id,name,code',
+            ])->orderBy('name')->paginate(15)->withQueryString(),
         ]);
     }
 
@@ -45,8 +50,9 @@ class TeachingController extends Controller
             'academicYears' => $years,
             'currentYearId' => $years->firstWhere('is_current', true)?->id ?? $years->first()?->id,
             'teachers' => User::query()->where('role', 'teacher')->where('is_active', true)->orderBy('name')->get(['id', 'name', 'email']),
+            'subjectOptions' => Subject::query()->orderBy('name')->get(['id', 'code', 'name']),
             'subjects' => Subject::query()->with(['courseUnit:id,code,name', 'teachers:id,name,email'])
-                ->orderBy('name')->get(['id', 'course_unit_id', 'code', 'name']),
+                ->orderBy('name')->paginate(20)->withQueryString(),
         ]);
     }
 
