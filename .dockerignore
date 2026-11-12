@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Variables d'environnement et secrets
+.env
+.env.*
+!.env.example
+
+# Dépendances installées localement
+/vendor
+/node_modules
+
+# Fichiers compilés (générés dans Docker)
+/public/build
+/bootstrap/ssr
+
+# Cache et journaux
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+
+# Environnement de développement
+/.idea
+/.vscode
+/.phpunit.cache
+/phpunit.xml
+/coverage
+
+# Fichiers temporaires
+*.log
+.DS_Store
+Thumbs.db
