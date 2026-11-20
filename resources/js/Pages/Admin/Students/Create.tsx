@@ -42,26 +42,47 @@ interface AcademicGroup {
     enrollments_count: number;
 }
 
+interface AdmissionSource {
+    id: number;
+    candidate_first_name: string;
+    candidate_last_name: string;
+    email: string;
+    phone?: string;
+    birth_date?: string;
+    birth_place?: string;
+    desired_program_id?: string;
+    desired_level?: string;
+}
+
 interface Props {
     departments: Department[];
     academicYears: AcademicYear[];
     currentYear: AcademicYear | null;
     groups: AcademicGroup[];
+    admission?: AdmissionSource | null;
 }
 
-export default function CreateStudent({ departments = [], academicYears = [], currentYear, groups = [] }: Props) {
+export default function CreateStudent({ departments = [], academicYears = [], currentYear, groups = [], admission = null }: Props) {
+    const admittedDepartmentId = admission?.desired_program_id
+        ? departments.find(department => department.programs.some(program => String(program.id) === String(admission.desired_program_id)))?.id
+        : undefined;
+
     const { data, setData, post, processing, errors } = useForm({
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone: '',
-        birth_date: '',
+        first_name: admission?.candidate_first_name ?? '',
+        last_name: admission?.candidate_last_name ?? '',
+        email: admission?.email ?? '',
+        phone: admission?.phone ?? '',
+        birth_date: admission?.birth_date?.slice(0, 10) ?? '',
+        birth_place: admission?.birth_place ?? '',
+        nationality: '',
+        address: '',
         gender: 'M',
-        department_id: '',
-        program_id: '',
+        department_id: admittedDepartmentId ? String(admittedDepartmentId) : '',
+        program_id: admission?.desired_program_id ? String(admission.desired_program_id) : '',
         academic_year_id: String(currentYear?.id ?? academicYears[0]?.id ?? ''),
-        level: 'L1',
+        level: admission?.desired_level ?? 'L1',
         class_id: '',
+        admission_id: admission?.id ? String(admission.id) : '',
     });
 
     const submit = (event: React.FormEvent) => {
@@ -82,6 +103,7 @@ export default function CreateStudent({ departments = [], academicYears = [], cu
         ?.fee_schedules.find((schedule) => String(schedule.academic_year_id) === data.academic_year_id);
     const formatAmount = (amount: string) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(Number(amount));
     const formatDate = (date: string) => new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(`${date}T00:00:00`));
+    const formIsComplete = Boolean(data.first_name.trim() && data.last_name.trim() && data.email.trim() && data.birth_date && data.department_id && data.program_id && data.academic_year_id && data.level && feeSchedule);
 
     return (
         <AuthenticatedLayout
@@ -321,7 +343,7 @@ export default function CreateStudent({ departments = [], academicYears = [], cu
                             </Link>
                             <button
                                 type="submit"
-                                disabled={processing || departments.length === 0 || academicYears.length === 0 || !feeSchedule}
+                                disabled={processing || !formIsComplete}
                                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 transition disabled:opacity-50"
                             >
                                 <Save className="h-4 w-4" />

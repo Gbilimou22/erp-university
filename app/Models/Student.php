@@ -21,6 +21,10 @@ class Student extends Model
         'phone',
         'gender',
         'birth_date',
+        'birth_place',
+        'nationality',
+        'address',
+        'photo_path',
         'status',
     ];
 
@@ -50,5 +54,25 @@ class Student extends Model
     public function enrollments(): HasMany
     {
         return $this->hasMany(Enrollment::class);
+    }
+
+    public function admissions(): HasMany
+    {
+        return $this->hasMany(Admission::class);
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(StudentDocument::class);
+    }
+
+    public function sanctions(): HasMany
+    {
+        return $this->hasMany(DisciplinarySanction::class);
+    }
+
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(StudentCertificate::class);
     }
 }

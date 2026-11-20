@@ -1,16 +1,11 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { Head, Link } from '@inertiajs/react';
 import { ClipboardList } from 'lucide-react';
 
 type Assessment = { id: number; title: string; type: string; ends_at: string; duration_minutes: number | null; subject: { code: string; name: string }; attempt: { status: string; score: string | null; submission_reason: string } | null };
 const labels: Record<string, string> = { qcm: 'QCM', direct: 'Questions directes', mixed: 'Mixte', other: 'Autre' };
 
 export default function Index({ assessments }: { assessments: Assessment[] }) {
-    useEffect(() => {
-        const refresh = window.setInterval(() => router.reload({ only: ['assessments'] }), 15000);
-        return () => window.clearInterval(refresh);
-    }, []);
     return <AuthenticatedLayout header={<div><p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Portail étudiant</p><h1 className="mt-1 text-2xl font-semibold">Évaluations en cours</h1></div>}>
         <Head title="Évaluations en cours" />
         <main className="min-h-[calc(100vh-4rem)] bg-slate-50 px-4 py-7 sm:px-6 lg:px-8"><div className="mx-auto max-w-5xl space-y-6">

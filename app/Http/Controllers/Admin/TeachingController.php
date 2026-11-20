@@ -38,7 +38,7 @@ class TeachingController extends Controller
                 'courseUnit:id,faculty_id,code,name,credits',
                 'courseUnit.faculty:id,name,code',
                 'department:id,name,code',
-            ])->orderBy('name')->paginate(15)->withQueryString(),
+            ])->orderBy('name')->paginate(20)->withQueryString(),
         ]);
     }
 

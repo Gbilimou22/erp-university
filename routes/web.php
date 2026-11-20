@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\AccountRecoveryController;
 use App\Http\Controllers\Admin\GradePublicationController;
 use App\Http\Controllers\Admin\FinanceController as AdminFinanceController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\AdmissionController;
 use App\Http\Controllers\Teacher\AssessmentController as TeacherAssessmentController;
 use App\Http\Controllers\Teacher\NotificationController as TeacherNotificationController;
 use App\Http\Controllers\Teacher\TeachingProgressController;
@@ -57,28 +58,34 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
     })->name('dashboard');
 
     // --- ESPACE ADMIN (/admin/...) ---
-    Route::prefix('admin')->name('admin.')->middleware('role:admin')->group(function () {
+    Route::prefix('admin')->name('admin.')->middleware('role:admin,registrar,faculty_head,department_head,finance,hr,librarian,auditor')->group(function () {
 
         // Tableau de bord Admin
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
-        Route::get('/account-recovery', [AccountRecoveryController::class, 'index'])->name('account-recovery.index');
+        Route::get('/account-recovery', [AccountRecoveryController::class, 'index'])->name('account-recovery.index')->middleware('permission:settings.manage');
         Route::post('/account-recovery/{user}/reset', [AccountRecoveryController::class, 'reset'])->name('account-recovery.reset');
-        Route::get('/grades/publication', [GradePublicationController::class, 'index'])->name('grades.index');
-        Route::post('/grades/publication', [GradePublicationController::class, 'publish'])->name('grades.publish');
-        Route::get('/finance', [AdminFinanceController::class, 'index'])->name('finance.index');
-        Route::post('/finance/fees/{fee}/payments', [AdminFinanceController::class, 'recordPayment'])->name('finance.payments.store');
-        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::get('/grades/publication', [GradePublicationController::class, 'index'])->name('grades.index')->middleware('permission:grades.view');
+        Route::post('/grades/publication', [GradePublicationController::class, 'publish'])->name('grades.publish')->middleware('permission:grades.publish');
+        Route::get('/finance', [AdminFinanceController::class, 'index'])->name('finance.index')->middleware('permission:finance.view');
+        Route::post('/finance/fees/{fee}/payments', [AdminFinanceController::class, 'recordPayment'])->name('finance.payments.store')->middleware('permission:finance.manage');
+        Route::get('/admissions', [AdmissionController::class, 'index'])->name('admissions.index')->middleware('permission:admissions.view');
+        Route::post('/admissions', [AdmissionController::class, 'store'])->name('admissions.store')->middleware('permission:admissions.manage');
+        Route::post('/admissions/{admission}/decide', [AdmissionController::class, 'decide'])->name('admissions.decide')->middleware('permission:admissions.manage');
+        Route::patch('/admissions/documents/{document}/verify', [AdmissionController::class, 'verifyDocument'])->name('admissions.documents.verify');
+
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('permission:settings.manage');
         Route::post('/settings/platform', [SettingsController::class, 'updatePlatform'])->name('settings.platform.update');
         Route::put('/settings/departments/{department}/fee-schedule', [SettingsController::class, 'saveDepartmentFeeSchedule'])->name('settings.departments.fee-schedule.update');
 
         // Enseignants
-        Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index');
-        Route::get('/teachers/create', [TeacherController::class, 'create'])->name('teachers.create');
-        Route::post('/teachers', [TeacherController::class, 'store'])->name('teachers.store');
+        Route::get('/teachers', [TeacherController::class, 'index'])->name('teachers.index')->middleware('permission:teachers.view');
+        Route::get('/teachers/create', [TeacherController::class, 'create'])->name('teachers.create')->middleware('permission:teachers.manage');
+        Route::get('/teachers/{teacher}', [TeacherController::class, 'show'])->name('teachers.show')->middleware('permission:teachers.view');
+        Route::post('/teachers', [TeacherController::class, 'store'])->name('teachers.store')->middleware('permission:teachers.manage');
 
         // Maquette Pédagogique
-        Route::controller(CurriculumController::class)->prefix('curricula')->name('curricula.')->group(function () {
+        Route::controller(CurriculumController::class)->prefix('curricula')->name('curricula.')->middleware('permission:academic.manage')->group(function () {
             Route::get('/', 'index')->name('index');
             Route::post('/', 'store')->name('store');
             Route::delete('/{curriculum}', 'destroy')->name('destroy');
@@ -88,7 +95,7 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
             Route::delete('/semesters/{semester}/course-units/{courseUnit}', 'detachCourseUnit')->name('course-units.detach');
         });
 
-        Route::controller(ClassGroupController::class)->prefix('academic-groups')->name('academic-groups.')->group(function () {
+        Route::controller(ClassGroupController::class)->prefix('academic-groups')->name('academic-groups.')->middleware('permission:academic.manage')->group(function () {
             Route::get('/', 'index')->name('index');
             Route::get('/{classGroup}', 'show')->name('show');
             Route::post('/', 'store')->name('store');
@@ -98,7 +105,7 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         });
 
         // Emploi du temps (Admin)
-        Route::controller(TimetableController::class)->prefix('timetable')->name('timetable.')->group(function () {
+        Route::controller(TimetableController::class)->prefix('timetable')->name('timetable.')->middleware('permission:scheduling.manage')->group(function () {
             Route::get('/', 'index')->name('index');
             Route::get('/rooms', 'rooms')->name('rooms.index');
             Route::get('/entries', 'entries')->name('entries.index');
@@ -109,7 +116,7 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         });
 
         // Enseignements
-        Route::prefix('teaching')->name('teaching.')->controller(TeachingController::class)->group(function () {
+        Route::prefix('teaching')->name('teaching.')->controller(TeachingController::class)->middleware('permission:academic.manage')->group(function () {
             Route::get('/course-units', 'index')->name('index');
             Route::get('/subjects', 'subjects')->name('subjects.index');
             Route::get('/assignments', 'assignments')->name('assignments');
@@ -124,10 +131,10 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         });
 
         // Gestion des Étudiants
-        Route::resource('students', StudentController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
+        Route::resource('students', StudentController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])->middleware('permission:students.view');
 
         // Années Académiques
-        Route::prefix('academic-years')->name('academic-years.')->group(function () {
+        Route::prefix('academic-years')->name('academic-years.')->middleware('permission:institution.manage')->group(function () {
             Route::get('/', [AcademicYearController::class, 'index'])->name('index');
             Route::post('/', [AcademicYearController::class, 'store'])->name('store');
             Route::patch('/{academicYear}/set-current', [AcademicYearController::class, 'setCurrent'])->name('set-current');
@@ -135,7 +142,7 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
         });
 
         // Structure Académique
-        Route::prefix('academic-structure')->name('academic.')->group(function () {
+        Route::prefix('academic-structure')->name('academic.')->middleware('permission:institution.manage')->group(function () {
             Route::get('/', [AcademicStructureController::class, 'index'])->name('index');
 
             // Campus
@@ -165,7 +172,23 @@ Route::middleware(['auth', 'active', 'verified', RequirePasswordChange::class])-
     Route::prefix('student')->name('student.')->middleware('role:student')->group(function () {
         Route::get('/dashboard', function () {
             $currentYear = \App\Models\AcademicYear::query()->where('is_current', true)->first();
-            $student = auth()->user()->student()->with('department.faculty')->first();
+            $student = auth()->user()->student()
+                ->with([
+                    'department.faculty',
+                    'enrollments.academicYear:id,name',
+                    'enrollments.program:id,name',
+                    'enrollments.classGroup:id,code,name,level_code,capacity',
+                ])
+                ->first();
+
+            if ($student) {
+                $student->setRelation('enrollments', $student->enrollments->map(function ($enrollment) {
+                    $payload = $enrollment->toArray();
+                    $payload['class_group'] = $enrollment->classGroup?->only(['code', 'name', 'level_code', 'capacity']);
+                    unset($payload['class_group_id']);
+                    return $payload;
+                }));
+            }
             $enrollments = $student?->enrollments()->where('status', 'active');
             $enrollment = $enrollments
                 ? (clone $enrollments)->when($currentYear, fn ($query) => $query->where('academic_year_id', $currentYear->id))

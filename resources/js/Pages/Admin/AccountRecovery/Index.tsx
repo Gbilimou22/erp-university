@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
+import ConfirmDialog from '@/Components/ConfirmDialog';
 
 type Account = { id: number; name: string; email: string; role: string; is_active: boolean };
 type Paginated<T> = { data: T[]; links: { url: string | null; label: string; active: boolean }[]; total: number };
@@ -12,6 +13,7 @@ export default function Index({ users, filters, temporaryPassword, recoveredUser
     recoveredUser?: string;
 }) {
     const { data, setData, get, processing } = useForm({ search: filters.search ?? '' });
+    const [resetTarget, setResetTarget] = useState<Account | null>(null);
     const submit: FormEventHandler = (event) => {
         event.preventDefault();
         get(route('admin.account-recovery.index'), { preserveState: true });
@@ -42,11 +44,7 @@ export default function Index({ users, filters, temporaryPassword, recoveredUser
                                     <p className="font-medium text-slate-900">{user.name}</p>
                                     <p className="text-sm text-slate-600">{user.email} · {user.role} · {user.is_active ? 'Actif' : 'Désactivé'}</p>
                                 </div>
-                                <button type="button" onClick={() => {
-                                    if (window.confirm(`Après vérification d’identité, réinitialiser le mot de passe de ${user.name} ?`)) {
-                                        router.post(route('admin.account-recovery.reset', user.id));
-                                    }
-                                }} className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-50">Générer un mot de passe temporaire</button>
+                                <button type="button" onClick={() => setResetTarget(user)} className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-50">Générer un mot de passe temporaire</button>
                             </div>
                         ))}
                         {users.data.length === 0 && <p className="p-6 text-sm text-slate-500">Aucun compte trouvé.</p>}
@@ -56,6 +54,15 @@ export default function Index({ users, filters, temporaryPassword, recoveredUser
                     {users.links.map((link, index) => link.url ? <Link key={index} href={link.url} className={`rounded px-3 py-1 text-sm ${link.active ? 'bg-indigo-700 text-white' : 'bg-white text-slate-700'}`} dangerouslySetInnerHTML={{ __html: link.label }} /> : null)}
                 </nav>
             </div>
+            <ConfirmDialog
+                show={resetTarget !== null}
+                title="Réinitialiser le mot de passe"
+                description={<p>Après vérification d’identité, réinitialiser le mot de passe de <strong>{resetTarget?.name}</strong> ? Un nouveau mot de passe temporaire sera généré.</p>}
+                confirmLabel="Générer le mot de passe"
+                tone="primary"
+                onConfirm={() => { if (resetTarget) router.post(route('admin.account-recovery.reset', resetTarget.id), {}, { onSuccess: () => setResetTarget(null) }); }}
+                onClose={() => setResetTarget(null)}
+            />
         </AuthenticatedLayout>
     );
 }

@@ -17,7 +17,7 @@ export default function Authenticated({ header, children }: PropsWithChildren<{ 
     const user = page.props.auth.user;
     const platformName = page.props.platformSettings?.platform_name || 'Université';
     const role = (user.role ?? 'admin').toLowerCase();
-    const isAdmin = role === 'admin';
+    const isAdmin = ['admin', 'registrar', 'faculty_head', 'department_head', 'finance', 'hr', 'librarian', 'auditor'].includes(role);
     const isStudent = role === 'student';
     const isTeacher = role === 'teacher';
     const isParent = role === 'parent';
@@ -30,6 +30,7 @@ export default function Authenticated({ header, children }: PropsWithChildren<{ 
             { label: 'Programmes et maquettes', href: route('admin.curricula.index'), active: route().current('admin.curricula.*'), icon: BookMarked },
             { label: 'Groupes pédagogiques', href: route('admin.academic-groups.index'), active: route().current('admin.academic-groups.*'), icon: School },
             { label: 'Étudiants', href: route('admin.students.index'), active: route().current('admin.students.*'), icon: Users },
+            { label: 'Admissions', href: route('admin.admissions.index'), active: route().current('admin.admissions.*'), icon: ClipboardCheck },
             { label: 'Service scolarité', href: route('admin.finance.index'), active: route().current('admin.finance.*'), icon: CreditCard },
             { label: 'Paramètres', href: route('admin.settings.index'), active: route().current('admin.settings.*'), icon: Settings },
             { label: 'Enseignants', href: route('admin.teachers.index'), active: route().current('admin.teachers.*'), icon: GraduationCap },
@@ -67,7 +68,7 @@ export default function Authenticated({ header, children }: PropsWithChildren<{ 
     const adminGroups = [
         { title: 'Vue générale', labels: ['Tableau de bord'] },
         { title: 'Structure et cursus', labels: ['Structure académique', 'Années universitaires', 'Programmes et maquettes', 'Groupes pédagogiques'] },
-        { title: 'Étudiants et équipe', labels: ['Étudiants', 'Service scolarité', 'Enseignants'] },
+        { title: 'Étudiants et équipe', labels: ['Étudiants', 'Admissions', 'Service scolarité', 'Enseignants'] },
         { title: 'Configuration', labels: ['Paramètres'] },
         { title: 'Enseignements', labels: ['Unités d’enseignement', 'Matières', 'Affectations enseignants'] },
         { title: 'Planning', labels: ['Emploi du temps', 'Salles', 'Séances planifiées'] },

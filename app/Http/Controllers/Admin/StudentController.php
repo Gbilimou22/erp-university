@@ -10,6 +10,7 @@ use App\Models\Department;
 use App\Models\DepartmentFeeSchedule;
 use App\Models\Enrollment;
 use App\Models\Faculty;
+use App\Models\Admission;
 use App\Models\Student;
 use App\Models\StudentFee;
 use App\Models\Program;
@@ -72,9 +73,19 @@ class StudentController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         $this->authorize('create', Student::class);
+
+        $admission = null;
+        if ($request->filled('admission')) {
+            $admission = Admission::query()
+                ->with('program:id,department_id,name,code')
+                ->where('status', 'admitted')
+                ->where('decision', 'accepted')
+                ->whereNull('student_id')
+                ->findOrFail($request->integer('admission'));
+        }
 
         return Inertia::render('Admin/Students/Create', [
             'departments' => Department::with([
@@ -85,6 +96,7 @@ class StudentController extends Controller
             'academicYears' => AcademicYear::select('id', 'name', 'is_current')->orderByDesc('start_date')->get(),
             'currentYear' => AcademicYear::where('is_current', true)->first(['id', 'name']),
             'groups' => ClassGroup::query()->withCount('enrollments')->orderBy('code')->get(['id', 'program_id', 'academic_year_id', 'level_code', 'code', 'name', 'capacity']),
+            'admission' => $admission?->only(['id', 'candidate_first_name', 'candidate_last_name', 'email', 'phone', 'birth_date', 'birth_place', 'desired_program_id', 'desired_level']),
         ]);
     }
 
@@ -103,13 +115,29 @@ class StudentController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:students,email', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30'],
             'birth_date' => ['required', 'date', 'before:today'],
+            'birth_place' => ['nullable', 'string', 'max:150'],
+            'nationality' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:1000'],
             'gender' => ['required', 'in:M,F'],
             'department_id' => ['required', 'exists:departments,id'],
             'program_id' => ['required', 'exists:programs,id'],
             'academic_year_id' => ['required', 'exists:academic_years,id'],
             'level' => ['required', 'regex:/^(L[1-7]|M[1-2]|D[1-3])$/'],
             'class_id' => ['nullable', 'exists:classes,id'],
+            'admission_id' => ['nullable', 'integer', 'exists:admissions,id'],
         ]);
+
+        if (!empty($validated['admission_id'])) {
+            $sourceAdmission = Admission::query()
+                ->whereKey($validated['admission_id'])
+                ->where('status', 'admitted')
+                ->where('decision', 'accepted')
+                ->firstOrFail();
+
+            if ($sourceAdmission->student_id || Enrollment::where('admission_id', $sourceAdmission->id)->exists()) {
+                throw ValidationException::withMessages(['admission_id' => 'Cette admission a déjà été convertie en inscription.']);
+            }
+        }
 
         $department = Department::with('faculty')->findOrFail($validated['department_id']);
         Program::whereKey($validated['program_id'])
@@ -170,6 +198,9 @@ class StudentController extends Controller
                 'phone' => $validated['phone'] ?? null,
                 'gender' => $validated['gender'],
                 'birth_date' => $validated['birth_date'],
+                'birth_place' => $validated['birth_place'] ?? null,
+                'nationality' => $validated['nationality'] ?? null,
+                'address' => $validated['address'] ?? null,
                 'status' => 'active',
             ]);
 
@@ -181,6 +212,9 @@ class StudentController extends Controller
                 'academic_year_id' => $validated['academic_year_id'],
                 'level' => $validated['level'],
                 'status' => 'pending',
+                'administrative_status' => 'pending',
+                'pedagogical_status' => 'pending',
+                'admission_id' => $validated['admission_id'] ?? null,
             ]);
 
             StudentFee::create([
@@ -190,6 +224,10 @@ class StudentController extends Controller
                 'amount' => $feeSchedule->registration_amount,
                 'due_date' => $feeSchedule->registration_due_date,
             ]);
+            if (!empty($validated['admission_id'])) {
+                Admission::whereKey($validated['admission_id'])->update(['student_id' => $student->id]);
+            }
+
             for ($installmentNumber = 1; $installmentNumber <= 3; $installmentNumber++) {
                 StudentFee::create([
                     'enrollment_id' => $enrollment->id,
@@ -232,7 +270,16 @@ class StudentController extends Controller
     {
         $this->authorize('view', $student);
 
-        $student->load(['user', 'department.faculty', 'enrollments.academicYear', 'enrollments.program']);
+        $student->load([
+            'user',
+            'department.faculty',
+            'enrollments.academicYear',
+            'enrollments.program',
+            'documents.verifier',
+            'sanctions.recorder',
+            'certificates.issuer',
+            'admissions.program',
+        ]);
         return Inertia::render('Admin/Students/Show', ['student' => $student]);
     }
 
@@ -261,6 +308,9 @@ class StudentController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('students', 'email')->ignore($student->id), Rule::unique('users', 'email')->ignore($student->user_id)],
             'phone' => ['nullable', 'string', 'max:30'],
             'birth_date' => ['required', 'date', 'before:today'],
+            'birth_place' => ['nullable', 'string', 'max:150'],
+            'nationality' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:1000'],
             'gender' => ['required', 'in:M,F'],
             'department_id' => ['required', 'exists:departments,id'],
             'program_id' => ['required', 'exists:programs,id'],
@@ -294,6 +344,9 @@ class StudentController extends Controller
                 'email' => $validated['email'],
                 'phone' => $validated['phone'] ?? null,
                 'birth_date' => $validated['birth_date'],
+                'birth_place' => $validated['birth_place'] ?? null,
+                'nationality' => $validated['nationality'] ?? null,
+                'address' => $validated['address'] ?? null,
                 'gender' => $validated['gender'],
                 'department_id' => $department->id,
             ]);
@@ -304,6 +357,8 @@ class StudentController extends Controller
                 'academic_year_id' => $validated['academic_year_id'],
                 'level' => strtoupper($validated['level']),
                 'class_id' => $classGroup?->id,
+                'administrative_status' => 'active',
+                'pedagogical_status' => 'active',
             ]);
 
             AuditEvent::create([

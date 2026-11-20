@@ -11,10 +11,19 @@ class EnsureRole
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();
-        $role = strtolower((string) ($user?->role ?? $user?->user_type ?? ''));
-        $allowedRoles = array_map('strtolower', $roles);
+        abort_unless($user, 403);
 
-        abort_unless($user && in_array($role, $allowedRoles, true), 403);
+        $allowedRoles = array_map('strtolower', $roles);
+        $allowed = false;
+
+        foreach ($allowedRoles as $allowedRole) {
+            if ($user->hasRole($allowedRole)) {
+                $allowed = true;
+                break;
+            }
+        }
+
+        abort_unless($allowed, 403);
 
         return $next($request);
     }

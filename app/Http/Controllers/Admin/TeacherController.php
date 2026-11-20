@@ -18,6 +18,17 @@ class TeacherController extends Controller
         return Inertia::render('Admin/Teachers/Create');
     }
 
+    public function show(User $teacher): Response
+    {
+        abort_unless($teacher->role === 'teacher', 404);
+
+        $teacher->load(['taughtSubjectAssignments.subject', 'taughtSubjectAssignments.academicYear']);
+
+        return Inertia::render('Admin/Teachers/Show', [
+            'teacher' => $teacher,
+        ]);
+    }
+
     public function index(): Response
     {
         return Inertia::render('Admin/Teachers/Index', [

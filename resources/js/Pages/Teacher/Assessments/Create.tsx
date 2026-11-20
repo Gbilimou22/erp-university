@@ -17,6 +17,22 @@ export default function Create({ subjects, academicYear }: { subjects: Subject[]
     const form = useForm<{ subject_id: string; department_id: string; title: string; instructions: string; type: AssessmentType; starts_at: string; ends_at: string; duration_minutes: string; anti_cheat_enabled: boolean; questions: QuestionInput[] }>({ subject_id: '', department_id: '', title: '', instructions: '', type: 'qcm', starts_at: '', ends_at: '', duration_minutes: '', anti_cheat_enabled: false, questions: [{ text: '', type: 'qcm', points: '1', options: [{ text: '', is_correct: true }, { text: '', is_correct: false }] }] });
     const submit: FormEventHandler = (event) => { event.preventDefault(); form.post(route('teacher.assessments.store'), { preserveScroll: true, onSuccess: () => form.reset() }); };
     const updateQuestion = (index: number, field: keyof QuestionInput, value: unknown) => form.setData('questions', form.data.questions.map((question, i) => i === index ? { ...question, [field]: value } : question));
+    const mixedIsComplete = form.data.type !== 'mixed'
+        || (form.data.questions.some(question => question.type === 'qcm')
+            && form.data.questions.some(question => question.type === 'direct'));
+    const formIsComplete = Boolean(
+        form.data.subject_id
+        && form.data.department_id
+        && form.data.title.trim()
+        && form.data.starts_at
+        && form.data.ends_at
+        && form.data.questions.length > 0
+        && mixedIsComplete
+        && form.data.questions.every(question => question.text.trim() && Number(question.points) >= 0.01
+            && (question.type !== 'qcm' || (question.options.length >= 2
+                && question.options.every(option => option.text.trim())
+                && question.options.filter(option => option.is_correct).length === 1)))
+    );
     const updateOption = (questionIndex: number, optionIndex: number, field: keyof OptionInput, value: unknown) => form.setData('questions', form.data.questions.map((question, i) => i === questionIndex ? { ...question, options: question.options.map((option, j) => j === optionIndex ? { ...option, [field]: value } : option) } : question));
 
     return <AuthenticatedLayout header={<div><p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Espace enseignant</p><h1 className="mt-1 text-2xl font-semibold text-slate-900">Évaluations</h1></div>}>
@@ -33,7 +49,7 @@ export default function Create({ subjects, academicYear }: { subjects: Subject[]
                         <label className="text-sm font-medium">Matière<select required value={form.data.subject_id} onChange={e => form.setData(data => ({ ...data, subject_id: e.target.value, department_id: '' }))} className="mt-1 w-full rounded-lg border-slate-300"><option value="">Choisir</option>{subjects.map(s => <option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}</select>{form.errors.subject_id && <span className="mt-1 block text-xs text-red-600">{form.errors.subject_id}</span>}</label>
                         <label className="text-sm font-medium">Département destinataire<select required value={form.data.department_id} onChange={e => form.setData('department_id', e.target.value)} disabled={!form.data.subject_id} className="mt-1 w-full rounded-lg border-slate-300 disabled:bg-slate-100"><option value="">Choisir un département</option>{(subjects.find(s => String(s.id) === form.data.subject_id)?.departments ?? []).map(d => <option key={d.id} value={d.id}>{d.name} ({d.code})</option>)}</select>{form.errors.department_id && <span className="mt-1 block text-xs text-red-600">{form.errors.department_id}</span>}</label>
                         <label className="text-sm font-medium">Titre<input required maxLength={150} value={form.data.title} onChange={e => form.setData('title', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" placeholder="Ex. Examen de mi-semestre" /></label>
-                        <label className="text-sm font-medium">Type d’évaluation<select value={form.data.type} onChange={e => { const type = e.target.value as AssessmentType; form.setData(data => ({ ...data, type, questions: type === 'direct' ? data.questions.map(question => ({ ...question, type: 'direct' as const })) : type === 'qcm' ? data.questions.map(question => ({ ...question, type: 'qcm' as const })) : data.questions })); }} className="mt-1 w-full rounded-lg border-slate-300">{Object.entries(typeLabels).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></label>
+                        <label className="text-sm font-medium">Type d’évaluation<select value={form.data.type} onChange={e => { const type = e.target.value as AssessmentType; form.setData(data => { if (type === 'direct') return { ...data, type, questions: data.questions.map(question => ({ ...question, type: 'direct' as const })) }; if (type === 'qcm') return { ...data, type, questions: data.questions.map(question => ({ ...question, type: 'qcm' as const })) }; if (type === 'mixed' && !data.questions.some(question => question.type === 'direct')) return { ...data, type, questions: [...data.questions, { text: '', type: 'direct' as const, points: '1', options: [{ text: '', is_correct: true }, { text: '', is_correct: false }] }] }; return { ...data, type }; }); }} className="mt-1 w-full rounded-lg border-slate-300">{Object.entries(typeLabels).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></label>
                         <label className="text-sm font-medium">Durée en minutes<input type="number" min="1" max="600" value={form.data.duration_minutes} onChange={e => form.setData('duration_minutes', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" placeholder="Optionnelle" /></label>
                         <label className="text-sm font-medium">Début<input required type="datetime-local" value={form.data.starts_at} onChange={e => form.setData('starts_at', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" /></label>
                         <label className="text-sm font-medium">Fin<input required type="datetime-local" value={form.data.ends_at} onChange={e => form.setData('ends_at', e.target.value)} className="mt-1 w-full rounded-lg border-slate-300" /></label>
@@ -47,8 +63,8 @@ export default function Create({ subjects, academicYear }: { subjects: Subject[]
                         </fieldset>)}
                         <button type="button" onClick={() => form.setData('questions', [...form.data.questions, { text: '', type: 'qcm', points: '1', options: [{ text: '', is_correct: true }, { text: '', is_correct: false }] }])} className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-800">+ Ajouter une question</button>
                     </div>
-                    {Object.entries(form.errors).map(([key, value]) => <p key={key} className="text-sm text-red-700">{value}</p>)}
-                    <div><button disabled={form.processing} className="rounded-lg bg-indigo-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{form.processing ? 'Enregistrement…' : 'Créer le brouillon'}</button><p className="mt-2 text-xs text-slate-500">L’évaluation reste invisible aux étudiants jusqu’à son lancement dans le créneau prévu.</p></div>
+                    {Object.keys(form.errors).length > 0 && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p className="font-semibold">L’évaluation n’a pas pu être créée.</p><ul className="mt-2 list-disc space-y-1 pl-5">{Object.entries(form.errors).map(([key, value]) => <li key={key}>{String(value).startsWith('validation.') ? 'Vérifiez les informations saisies dans ce champ.' : value}</li>)}</ul></div>}
+                    <div><button disabled={form.processing || !formIsComplete} className="rounded-lg bg-indigo-700 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{form.processing ? 'Enregistrement…' : 'Créer le brouillon'}</button><p className="mt-2 text-xs text-slate-500">L’évaluation reste invisible aux étudiants jusqu’à son lancement dans le créneau prévu.</p></div>
                 </form>}
             </section>
                     </div></main>

@@ -51,8 +51,8 @@ JWT n’est pas un objectif à lui seul : un jeton de session Web ou un jeton Sa
 | Profil | Responsabilités principales |
 |---|---|
 | Administrateur système | Paramètres, comptes, rôles, permissions, sécurité, sauvegardes et audit technique. |
-| Direction / Scolarité | Structure, admissions, inscriptions, dossiers et décisions académiques. |
-| Responsable de faculté / département | Programmes, affectations, groupes, validations et rapports dans son périmètre. |
+| Direction / Scolarité | Piloter les admissions, valider les décisions, gérer les inscriptions administratives et pédagogiques, tenir les dossiers étudiants et produire les actes académiques. |
+| Responsable de faculté / département | Programmes, affectations, groupes, validations académiques, avis sur les dossiers et rapports dans son périmètre. |
 | Enseignant | Enseignements qui lui sont affectés, présence, notes et supports autorisés. |
 | Finance / Comptabilité | Tarifs, échéanciers, paiements, rapprochement et écritures selon délégation. |
 | Bibliothécaire | Catalogue, exemplaires, prêts, retours, réservations et pénalités. |
@@ -65,6 +65,9 @@ Les rôles sont des regroupements pratiques de permissions. Les autorisations ef
 
 ### Principes de périmètre
 
+- Une **admission** est une décision relative à une candidature ; elle précède l’inscription mais ne crée pas automatiquement un étudiant actif.
+- Une **inscription administrative** officialise l’appartenance à l’université pour une année, une filière et un niveau.
+- Une **inscription pédagogique** détermine les UE, ECUE, matières et contraintes de suivi qui seront réellement suivis.
 - Une **inscription** est un événement lié à un étudiant, une année universitaire, une filière et un niveau ; elle ne doit pas être confondue avec le profil permanent de l’étudiant.
 - Les frais dus, les paiements reçus et les écritures comptables sont des concepts distincts. Un paiement confirmé ne doit pas être effacé ; une correction passe par annulation/remboursement tracé.
 - Une note brouillon, une note validée et un résultat publié ont des états et des droits différents.
@@ -83,6 +86,51 @@ Chaque exigence ci-dessous doit être transformée en critères d’acceptation 
 - Filtrer la structure selon le campus et les responsabilités de l’utilisateur.
 
 ### 4.2 Admissions et étudiants
+
+#### Missions du service de scolarité
+
+Le service de scolarité assure les activités suivantes.
+
+**Admissions**
+
+- Recevoir les demandes d’admission et créer le dossier du candidat.
+- Vérifier les pièces obligatoires, leur authenticité déclarée, leur lisibilité et leur complétude.
+- Vérifier les conditions d’accès à la formation demandée, notamment le diplôme requis et les relevés antérieurs.
+- Enregistrer la candidature, son programme, son niveau souhaité, ses pièces et son historique de traitement.
+- Transmettre le dossier aux responsables ou instances habilitées lorsque une étude complémentaire est nécessaire.
+- Enregistrer la décision d’admission : acceptée, refusée, en attente ou nécessitant une pièce complémentaire.
+- Conserver le motif de refus ou la décision prise, son auteur, sa date et les pièces ayant justifié la décision.
+- Informer le candidat de la décision et lui indiquer les étapes ou documents nécessaires à l’inscription.
+
+**Inscriptions administratives et pédagogiques**
+
+- Après admission, constituer le dossier administratif officiel de l’étudiant.
+- Reprendre ou compléter les informations personnelles, coordonnées, photographie et documents d’identité.
+- Générer un matricule universitaire unique, non réutilisable et sûr en concurrence.
+- Affecter l’étudiant à une filière, un niveau d’études et, lorsqu’elle est déjà constituée, une classe ou un groupe.
+- Vérifier les conditions administratives et financières avant activation de l’inscription administrative.
+- Distinguer clairement l’inscription administrative, qui officialise l’appartenance à l’université, de l’inscription pédagogique, qui détermine les UE, ECUE et matières suivies.
+- Autoriser l’inscription pédagogique uniquement après les validations prévues par le règlement pédagogique.
+- Gérer l’inscription initiale, la réinscription annuelle, les réaffectations de filière, les changements de niveau et les événements de reprise.
+- Empêcher une modification silencieuse d’un parcours, d’un niveau ou d’un statut : toute décision conserve son auteur, sa date, son motif et l’ancien état.
+
+**Dossier individuel étudiant**
+
+Le dossier permanent de chaque étudiant contient ou référence :
+
+- les informations personnelles et coordonnées ;
+- la photographie officielle ;
+- les pièces d’identité et documents administratifs ;
+- les diplômes, attestations et relevés antérieurs ;
+- l’historique des inscriptions, formations suivies, niveaux et changements de parcours ;
+- les résultats académiques publiés ;
+- les sanctions disciplinaires, avec motif, autorité décisionnaire et dates ;
+- les diplômes, attestations et procès-verbaux obtenus ;
+- les dates de création, mise à jour, vérification et, le cas échéant, archivage.
+
+Le dossier doit rester consultable pendant tout le parcours universitaire et être filtré selon les rôles, les responsabilités et les données autorisées. Les documents privés restent hors du répertoire public.
+
+**Règles communes**
 
 - Gérer préinscription, admission, inscription initiale et réinscription annuelle avec statuts, pièces requises, validation et motifs de refus.
 - Générer un matricule non réutilisable et sûr en concurrence ; sa règle doit être configurable par établissement/année si nécessaire.
@@ -292,7 +340,7 @@ Les noms sont des propositions à stabiliser avant d’écrire les migrations m�
 
 **Institution :** `institutions(id, code, legal_name, display_name, timezone, default_currency, settings_json)` ; `campuses(id, institution_id, code, name, address_id, active)` ; `faculties(id, campus_id, code, name, active)` ; `departments(id, faculty_id, code, name, active)` ; `programs(id, department_id, code, name, degree_level, duration_years, active)` ; `program_options(id, program_id, code, name)` ; `academic_years(id, institution_id, code, label, starts_on, ends_on, status)` ; `semesters(id, academic_year_id, code, starts_on, ends_on)` ; `cohorts(id, program_id, academic_year_id, code, level)` ; `class_groups(id, cohort_id, code, capacity)` ; `rooms(id, campus_id, code, name, room_type, capacity)`.
 
-**Identité et scolarité :** `users(id, name, email, password_hash, email_verified_at, is_active)` ; `roles`, `permissions`, `role_user`, `permission_role`, `user_scope_assignments` ; `students(id, user_id nullable, registration_number, legal_identity_fields..., status)` ; `guardians(id, user_id nullable, identity/contact fields)` ; `student_guardians(student_id, guardian_id, relationship, is_primary, can_view_records)` ; `admissions(id, applicant fields, submitted_at, decision, decided_by)` ; `enrollments(id, student_id, academic_year_id, program_id, option_id nullable, cohort_id, status, enrolled_at)` ; `student_documents(id, student_id, document_type, storage_key, checksum, verification_status, verified_by)` ; `student_status_events(id, student_id, from_status, to_status, reason, effective_at, actor_id)` ; `academic_history_items(id, student_id, institution_name, program_name, start_year, end_year, outcome)`.
+**Identité et scolarité :** `users(id, name, email, password_hash, email_verified_at, is_active)` ; `roles`, `permissions`, `role_user`, `permission_role`, `user_scope_assignments` ; `students(id, user_id nullable, registration_number, identity_fields, profile_photo_key, status)` ; `guardians(id, user_id nullable, identity/contact fields)` ; `student_guardians(student_id, guardian_id, relationship, is_primary, can_view_records)` ; `admissions(id, candidate_identity_fields, desired_program_id, desired_level, submitted_at, status, decision, decision_reason, decided_by, decided_at)` ; `admission_documents(admission_id, document_type, storage_key, checksum, required, verification_status, verified_by, retention_policy)` ; `enrollments(id, student_id, academic_year_id, program_id, option_id nullable, cohort_id, level, administrative_status, pedagogical_status, enrolled_at)` ; `student_documents(id, student_id, document_type, storage_key, checksum, verification_status, verified_by)` ; `student_status_events(id, student_id, from_status, to_status, reason, effective_at, actor_id)` ; `academic_history_items(id, student_id, institution_name, program_name, start_year, end_year, outcome)` ; `disciplinary_sanctions(id, student_id, sanction_type, reason, authority, imposed_at, effective_until, document_key)` ; `student_certificates(id, student_id, certificate_type, document_key, issued_at, issued_by, reference_number)`.
 
 **Enseignement et évaluation :** `teachers(id, user_id, employee_number, profile_fields...)` ; `teacher_qualifications`, `teacher_specialties`, `teacher_contracts` ; `curricula(id, program_id, version, valid_from, valid_to, status)` ; `course_units(id, code, name, credits)` ; `subjects(id, course_unit_id, code, name, coefficient, hours)` ; `curriculum_subjects(curriculum_id, subject_id, semester_id, required)` ; `teaching_assignments(id, teacher_id, subject_id, class_group_id, starts_on, ends_on)` ; `timetable_sessions(id, teaching_assignment_id, room_id, starts_at, ends_at, session_type, status)` ; `assessment_components(id, teaching_assignment_id, name, weight, max_score, assessment_type)` ; `grades(id, enrollment_id, assessment_component_id, score, status, entered_by, validated_by, published_at)` ; `grade_publication_events` ; `attendance_records(id, timetable_session_id, enrollment_id, status, recorded_by, recorded_at)`.
 

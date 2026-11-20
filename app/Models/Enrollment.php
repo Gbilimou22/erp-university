@@ -19,6 +19,9 @@ class Enrollment extends Model
         'academic_year_id',
         'level',
         'status',
+        'administrative_status',
+        'pedagogical_status',
+        'admission_id',
     ];
 
     /**
@@ -50,6 +53,11 @@ class Enrollment extends Model
     /**
      * L'inscription appartient à une année académique.
      */
+    public function admission(): BelongsTo
+    {
+        return $this->belongsTo(Admission::class);
+    }
+
     public function academicYear(): BelongsTo
     {
         return $this->belongsTo(AcademicYear::class);

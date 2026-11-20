@@ -10,7 +10,9 @@ use App\Models\AssessmentQuestion;
 use App\Models\AssessmentAttempt;
 use App\Models\AuditEvent;
 use App\Models\Subject;
+use App\Models\Grade;
 use App\Models\Program;
+use App\Models\Department;
 use App\Services\SubjectEligibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,13 +49,38 @@ class AssessmentController extends Controller
         return Inertia::render('Teacher/Assessments/Create', [
             'subjects' => $year ? $request->user()->taughtSubjects()
                 ->wherePivot('academic_year_id', $year->id)
-                ->with('courseUnit:id,faculty_id')
+                ->with(['courseUnit:id,faculty_id', 'courseUnit.faculty.departments:id,faculty_id,name,code', 'department:id,name,code'])
                 ->orderBy('name')->get(['subjects.id', 'subjects.course_unit_id', 'subjects.department_id', 'subjects.code', 'subjects.name'])
-                ->map(fn (Subject $subject) => [
-                    'id' => $subject->id, 'code' => $subject->code, 'name' => $subject->name,
-                    'departments' => Program::query()->whereIn('id', $eligibility->programIds($subject, (int) $year->id))
-                        ->with('department:id,name,code')->get()->pluck('department')->filter()->unique('id')->values(),
-                ]) : [],
+                ->map(function (Subject $subject) use ($year, $eligibility) {
+                    $eligibleDepartmentIds = Program::query()
+                        ->whereIn('id', $eligibility->programIds($subject, (int) $year->id))
+                        ->pluck('department_id')
+                        ->filter()
+                        ->unique()
+                        ->all();
+
+                    if ($subject->department_id) {
+                        $eligibleDepartmentIds[] = $subject->department_id;
+                    }
+
+                    if ($subject->courseUnit?->faculty) {
+                        foreach ($subject->courseUnit->faculty->departments as $department) {
+                            $eligibleDepartmentIds[] = $department->id;
+                        }
+                    }
+
+                    $departments = Department::query()
+                        ->whereIn('id', array_unique(array_map('intval', $eligibleDepartmentIds)))
+                        ->orderBy('name')
+                        ->get(['id', 'name', 'code']);
+
+                    return [
+                        'id' => $subject->id,
+                        'code' => $subject->code,
+                        'name' => $subject->name,
+                        'departments' => $departments,
+                    ];
+                }) : [],
             'academicYear' => $year?->only(['id', 'name']),
         ]);
     }
@@ -156,6 +183,7 @@ class AssessmentController extends Controller
             'questions.*.text' => ['required', 'string', 'max:5000'],
             'questions.*.type' => ['required', 'in:qcm,direct'],
             'questions.*.points' => ['required', 'numeric', 'min:0.01', 'max:100'],
+            'questions.*.options' => ['nullable', 'array', 'max:10'],
         ]);
 
         if ($data['type'] === 'direct' && collect($data['questions'])->contains(fn ($question) => $question['type'] !== 'direct')) {
@@ -163,6 +191,12 @@ class AssessmentController extends Controller
         }
         if ($data['type'] === 'qcm' && collect($data['questions'])->contains(fn ($question) => $question['type'] !== 'qcm')) {
             throw ValidationException::withMessages(['questions' => 'Une évaluation QCM doit contenir uniquement des questions à choix.']);
+        }
+        if ($data['type'] === 'mixed') {
+            $questionTypes = collect($data['questions'])->pluck('type')->unique();
+            if (! $questionTypes->contains('qcm') || ! $questionTypes->contains('direct')) {
+                throw ValidationException::withMessages(['questions' => 'Une évaluation mixte doit contenir au moins une question QCM et une question directe.']);
+            }
         }
 
         $subject = $request->user()->taughtSubjects()
@@ -172,22 +206,38 @@ class AssessmentController extends Controller
             ->firstOrFail();
 
         $eligibleProgramIds = $eligibility->programIds($subject, (int) $year->id);
-        $eligibleDepartmentIds = Program::query()->whereIn('id', $eligibleProgramIds)->pluck('department_id')->unique()->all();
+        $eligibleDepartmentIds = Program::query()->whereIn('id', $eligibleProgramIds)->pluck('department_id')->filter()->unique()->all();
+
+        if ($subject->department_id) {
+            $eligibleDepartmentIds[] = $subject->department_id;
+        }
+
+        $subject->load('courseUnit.faculty.departments:id,faculty_id,name,code');
+        foreach ($subject->courseUnit?->faculty?->departments ?? [] as $department) {
+            $eligibleDepartmentIds[] = $department->id;
+        }
+
         if (! in_array((int) $data['department_id'], array_map('intval', $eligibleDepartmentIds), true)) {
             throw ValidationException::withMessages(['department_id' => 'Ce département ne propose pas cette matière dans une maquette de l’année courante.']);
         }
-        if ($eligibleProgramIds === []) {
-            throw ValidationException::withMessages(['subject_id' => 'Aucun programme étudiant n’est rattaché à cette matière pour l’année courante.']);
-        }
-
         foreach ($data['questions'] as $index => $question) {
             $options = $question['options'] ?? [];
             if ($question['type'] === 'qcm') {
-                $options = validator(['options' => $options], [
-                    'options' => ['required', 'array', 'min:2', 'max:10'],
-                    'options.*.text' => ['required', 'string', 'max:1000'],
-                    'options.*.is_correct' => ['required', 'boolean'],
-                ])->validate()['options'];
+                if (count($options) < 2) {
+                    throw ValidationException::withMessages(["questions.{$index}.options" => 'Une question QCM doit contenir au moins deux choix.']);
+                }
+                foreach ($options as $optionIndex => $option) {
+                    if (! is_array($option) || trim((string) ($option['text'] ?? '')) === '') {
+                        throw ValidationException::withMessages(["questions.{$index}.options.{$optionIndex}.text" => 'Saisissez le texte de chaque choix.']);
+                    }
+                    if (! array_key_exists('is_correct', $option)) {
+                        throw ValidationException::withMessages(["questions.{$index}.options.{$optionIndex}.is_correct" => 'Indiquez si ce choix est correct.']);
+                    }
+                }
+                $options = array_map(fn ($option) => [
+                    'text' => trim((string) $option['text']),
+                    'is_correct' => (bool) $option['is_correct'],
+                ], $options);
                 if (count(array_filter($options, fn ($option) => $option['is_correct'])) !== 1) {
                     throw ValidationException::withMessages(["questions.{$index}.options" => 'Chaque QCM doit proposer au moins deux choix et une seule bonne réponse.']);
                 }
@@ -332,11 +382,24 @@ class AssessmentController extends Controller
         abort_unless($assessment->teacher_id === $request->user()->id && $attempt->assessment_id === $assessment->id, 404);
         $data = $request->validate(['score' => ['required', 'numeric', 'min:0', 'max:10']]);
 
-        DB::transaction(function () use ($attempt, $data, $request) {
+        DB::transaction(function () use ($attempt, $assessment, $data, $request) {
             $lockedAttempt = AssessmentAttempt::query()->lockForUpdate()->findOrFail($attempt->id);
             abort_unless($lockedAttempt->status === 'submitted', 409, 'Cette tentative n’est pas en attente de correction.');
             $previousScore = $lockedAttempt->score;
             $lockedAttempt->forceFill(['score' => $data['score'], 'status' => 'corrected'])->save();
+
+            Grade::updateOrCreate([
+                'enrollment_id' => $lockedAttempt->enrollment_id,
+                'subject_id' => $assessment->subject_id,
+                'type' => 'cc',
+                'assessment_label' => $assessment->title,
+            ], [
+                'score' => $data['score'],
+                'entered_by' => $request->user()->id,
+                'status' => 'draft',
+                'published_by' => null,
+                'published_at' => null,
+            ]);
             AuditEvent::create([
                 'actor_id' => $request->user()->id,
                 'action' => 'assessment.attempt_corrected',

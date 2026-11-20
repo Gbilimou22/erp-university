@@ -1,5 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
+import { useState } from 'react';
+import ConfirmDialog from '@/Components/ConfirmDialog';
 
 type Assessment = {
     subject_id: number;
@@ -18,16 +20,17 @@ export default function Index({ assessments, flash }: {
     assessments: { data: Assessment[]; links: { url: string | null; label: string; active: boolean }[] };
     flash: { success?: string; error?: string };
 }) {
-    const publish = (assessment: Assessment) => {
-        const title = assessment.assessment_label || 'Évaluation historique';
-        if (!window.confirm(`Publier « ${title} » en ${assessment.subject_name} pour ${assessment.student_count} étudiant(s) ? Les notes publiées ne peuvent plus être modifiées par l’enseignant.`)) return;
+    const [publishTarget, setPublishTarget] = useState<Assessment | null>(null);
+
+    const publish = () => {
+        if (!publishTarget) return;
 
         router.post(route('admin.grades.publish'), {
-            subject_id: assessment.subject_id,
-            academic_year_id: assessment.academic_year_id,
-            type: assessment.type,
-            assessment_label: assessment.assessment_label,
-        }, { preserveScroll: true });
+            subject_id: publishTarget.subject_id,
+            academic_year_id: publishTarget.academic_year_id,
+            type: publishTarget.type,
+            assessment_label: publishTarget.assessment_label,
+        }, { preserveScroll: true, onSuccess: () => setPublishTarget(null) });
     };
 
     return (
@@ -45,7 +48,7 @@ export default function Index({ assessments, flash }: {
                                 <p className="mt-1 text-sm text-slate-600">{assessment.academic_year_name} · {typeLabels[assessment.type]} · {assessment.assessment_label || 'Évaluation historique'}</p>
                                 <p className="mt-1 text-xs text-slate-500">{assessment.student_count} étudiant(s) avec une note</p>
                             </div>
-                            <button onClick={() => publish(assessment)} className="rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-800">Publier cette évaluation</button>
+                            <button onClick={() => setPublishTarget(assessment)} className="rounded-lg bg-indigo-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-800">Publier cette évaluation</button>
                         </article>)}
                     </div>}
                 </section>
@@ -53,6 +56,15 @@ export default function Index({ assessments, flash }: {
                     {assessments.links.map((link, index) => link.url ? <a key={index} href={link.url} className={`rounded px-3 py-1 text-sm ${link.active ? 'bg-indigo-700 text-white' : 'bg-white text-slate-700'}`} dangerouslySetInnerHTML={{ __html: link.label }} /> : null)}
                 </nav>
             </main>
+            <ConfirmDialog
+                show={publishTarget !== null}
+                title="Publier cette évaluation"
+                description={<p>Publier <strong>{publishTarget?.assessment_label || 'Évaluation historique'}</strong> en <strong>{publishTarget?.subject_name}</strong> pour <strong>{publishTarget?.student_count} étudiant(s)</strong> ? Les notes publiées ne pourront plus être modifiées par l’enseignant.</p>}
+                confirmLabel="Publier les notes"
+                tone="primary"
+                onConfirm={publish}
+                onClose={() => setPublishTarget(null)}
+            />
         </AuthenticatedLayout>
     );
 }
